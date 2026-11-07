@@ -20,15 +20,41 @@ def latest(stn="029", back=0):
     url = BASE.format(stn=stn)
     dds = requests.get(url + ".dds", timeout=60).text
     n = int(re.search(r"waveTime\[waveTime = (\d+)\]", dds).group(1))
+    nf = int(re.search(r"waveFrequency\[waveFrequency = (\d+)\]", dds).group(1))
     i = n - 1 - back
     q = ",".join([f"waveTime[{i}]", f"waveHs[{i}]", f"waveTp[{i}]", f"waveDp[{i}]", "waveFrequency", "waveBandwidth"]
-                 + [f"wave{v}[{i}][0:1:63]" for v in ("EnergyDensity", "A1Value", "B1Value", "A2Value", "B2Value")])
+                 + [f"wave{v}[{i}][0:1:{nf - 1}]" for v in ("EnergyDensity", "A1Value", "B1Value", "A2Value", "B2Value")])
     d = _ascii(url, q)
     return dict(
         time=dt.datetime.fromtimestamp(d["waveTime"][0], dt.timezone.utc),
         hs=d["waveHs"][0], tp=d["waveTp"][0], dp=d["waveDp"][0],
         f=d["waveFrequency"], df=d["waveBandwidth"], E=d["waveEnergyDensity"],
         a1=d["waveA1Value"], b1=d["waveB1Value"], a2=d["waveA2Value"], b2=d["waveB2Value"])
+
+def history(stn="029", days=30):
+    """All spectra from the last `days` days as arrays: time (n,), hs, tp, dp, f (nf,), df,
+    and E, a1, b1, a2, b2 (n, nf)."""
+    url = BASE.format(stn=stn)
+    dds = requests.get(url + ".dds", timeout=60).text
+    n = int(re.search(r"waveTime\[waveTime = (\d+)\]", dds).group(1))
+    nf = int(re.search(r"waveFrequency\[waveFrequency = (\d+)\]", dds).group(1))
+    t = _ascii(url, "waveTime")["waveTime"]
+    i0 = int(np.searchsorted(t, t[-1] - days * 86400))
+    r = f"[{i0}:1:{n - 1}]"
+    q = ",".join([f"waveTime{r}", f"waveHs{r}", f"waveTp{r}", f"waveDp{r}", "waveFrequency", "waveBandwidth"]
+                 + [f"wave{v}{r}[0:1:{nf - 1}]" for v in ("EnergyDensity", "A1Value", "B1Value", "A2Value", "B2Value")])
+    d = _ascii(url, q)
+    m = n - i0
+    return dict(time=d["waveTime"], hs=d["waveHs"], tp=d["waveTp"], dp=d["waveDp"],
+                f=d["waveFrequency"], df=d["waveBandwidth"],
+                **{k: d[f"wave{v}"].reshape(m, nf) for k, v in
+                   (("E", "EnergyDensity"), ("a1", "A1Value"), ("b1", "B1Value"), ("a2", "A2Value"), ("b2", "B2Value"))})
+
+def at(h, i):
+    """One spectrum (same keys as latest()) from a history() result."""
+    return dict(time=dt.datetime.fromtimestamp(h["time"][i], dt.timezone.utc), hs=h["hs"][i], tp=h["tp"][i],
+                dp=h["dp"][i], f=h["f"], df=h["df"], E=h["E"][i], a1=h["a1"][i], b1=h["b1"][i],
+                a2=h["a2"][i], b2=h["b2"][i])
 
 def mem(a1, b1, a2, b2, dirs_deg):
     """Directional distribution D(f, θ) [1/rad] on compass 'from' directions."""

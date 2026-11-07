@@ -1,22 +1,19 @@
-"""Shared helpers: bathymetry grid, local projection, wave dispersion, spots."""
+"""Shared helpers: bathymetry grids, local projection, wave dispersion."""
 import numpy as np
 from scipy.ndimage import gaussian_filter
+import config
 
 G = 9.81
-SPOTS = {  # approximate break location (lat, lon); model point is found at ~10 m depth nearby
-    "Linda Mar":   (37.5960, -122.5030),
-    "Ocean Beach": (37.7600, -122.5120),
-    "Mavericks":   (37.4935, -122.5000),
-    "Stinson":     (37.8990, -122.6430),
-}
 
 class Bathy:
-    def __init__(self, path="data/bathy_sf.npz", smooth_cells=1.0):
+    """A lat/lon elevation grid with a local flat projection (x east, y north, metres).
+    `smooth_m` sets the Gaussian smoothing used for ray tracing; default is one cell."""
+    def __init__(self, path, smooth_m=None):
         d = np.load(path)
+        self.path = path
         self.lat, self.lon = d["lat"], d["lon"]
         self.z = d["z"].astype(float)                       # elevation, + up (m)
         self.h = np.where(self.z < 0, -self.z, 0.0)          # water depth (m), 0 on land
-        self.hs = gaussian_filter(self.h, smooth_cells)      # lightly smoothed for ray stability
         self.lat0, self.lon0 = self.lat[0], self.lon[0]
         self.mx = 111320.0 * np.cos(np.radians(self.lat.mean()))
         self.my = 110540.0
@@ -24,6 +21,16 @@ class Bathy:
         self.dy = (self.lat[1] - self.lat[0]) * self.my
         self.nx, self.ny = self.lon.size, self.lat.size
         self.width, self.height = (self.nx - 1) * self.dx, (self.ny - 1) * self.dy
+        sig = 1.0 if smooth_m is None else (smooth_m / self.dy, smooth_m / self.dx)
+        self.hs = gaussian_filter(self.h, sig)               # smoothed depth for ray stability
+
+    @classmethod
+    def coarse(cls, region):
+        return cls(config.coarse_path(region))
+
+    @classmethod
+    def fine(cls, slug):
+        return cls(config.fine_path(slug), smooth_m=config.FINE_SMOOTH_M)
 
     def to_xy(self, lat, lon):
         return (np.asarray(lon) - self.lon0) * self.mx, (np.asarray(lat) - self.lat0) * self.my
@@ -31,16 +38,24 @@ class Bathy:
     def to_ll(self, x, y):
         return self.lat0 + np.asarray(y) / self.my, self.lon0 + np.asarray(x) / self.mx
 
+    def box_in(self, other):
+        """This grid's extent as (x0, x1, y0, y1) in `other`'s coordinates."""
+        x0, y0 = other.to_xy(self.lat[0], self.lon[0])
+        x1, y1 = other.to_xy(self.lat[-1], self.lon[-1])
+        return float(x0), float(x1), float(y0), float(y1)
+
     def depth_at(self, lat, lon):
-        j = int(round((lat - self.lat0) / (self.lat[1] - self.lat[0])))
-        i = int(round((lon - self.lon0) / (self.lon[1] - self.lon[0])))
+        j = int(np.clip(round((lat - self.lat0) / (self.lat[1] - self.lat[0])), 0, self.ny - 1))
+        i = int(np.clip(round((lon - self.lon0) / (self.lon[1] - self.lon[0])), 0, self.nx - 1))
         return self.h[j, i]
 
     def site_point(self, lat, lon, target=10.0, radius_km=2.0):
-        """Nearest grid cell to (lat,lon) whose depth is within 30% of target, seaward side."""
+        """Nearest grid cell to (lat,lon) whose depth is within 15% of target."""
+        if target is None:
+            return lat, lon, self.depth_at(lat, lon)
         X, Y = np.meshgrid((self.lon - lon) * self.mx, (self.lat - lat) * self.my)
         dist = np.hypot(X, Y)
-        ok = (np.abs(self.h - target) < 0.3 * target) & (dist < radius_km * 1000)
+        ok = (np.abs(self.h - target) < 0.15 * target) & (dist < radius_km * 1000)
         if not ok.any():
             raise ValueError("no cell near target depth")
         j, i = np.unravel_index(np.where(ok, dist, np.inf).argmin(), dist.shape)

@@ -1,0 +1,6 @@
+slug,name,region,lat,lon,depth,kind,station
+linda-mar,Linda Mar,bayarea,37.5960,-122.5030,10,spot,
+ocean-beach,Ocean Beach,bayarea,37.7600,-122.5120,10,spot,
+mavericks,Mavericks,bayarea,37.4935,-122.5000,10,spot,
+stinson,Stinson,bayarea,37.8990,-122.6430,10,spot,
+sf-bar-buoy,SF Bar buoy (check),bayarea,37.7881,-122.6325,,buoy,142

@@ -20,9 +20,10 @@ class Tracer:
     def _interp(self, field, x, y):
         return map_coordinates(field, [y / self.b.dy, x / self.b.dx], order=1, mode="nearest")
 
-    def trace(self, x, y, theta, ds=40.0, max_steps=6000, min_depth=1.0, keep_path=False):
+    def trace(self, x, y, theta, ds=40.0, max_steps=6000, min_depth=1.0, keep_path=False, stop_box=None):
         """Trace rays from (x,y) heading theta (rad). Returns end state and status:
-        1 = left the domain (open water), 0 = hit land/shoal (blocked)."""
+        1 = left the domain (open water), 0 = hit land/shoal (blocked),
+        2 = entered stop_box (x0, x1, y0, y1), used to hand rays to a nested grid."""
         b = self.b
         x, y, th = (np.array(v, float) for v in (x, y, theta))
         alive = np.ones(x.shape, bool); status = np.zeros(x.shape, int)
@@ -46,6 +47,11 @@ class Tracer:
             hit = (depth < min_depth) & ~out
             status[a & out] = 1
             alive &= ~out & ~hit
+            if stop_box is not None:
+                x0, x1, y0, y1 = stop_box
+                inside = alive & (x > x0) & (x < x1) & (y > y0) & (y < y1)
+                status[inside] = 2
+                alive &= ~inside
             if keep_path:
                 path.append((np.where(a, x, np.nan), np.where(a, y, np.nan)))
         status[alive] = 0                                       # trapped -> treat as blocked
@@ -56,21 +62,22 @@ def compass_from(theta_travel_back):
     return (90.0 - np.degrees(theta_travel_back)) % 360.0
 
 PERIODS = [6, 8, 10, 12, 14, 16, 18, 20]
-DIR_BINS = np.arange(0, 360, 5.0)
+DIR_BINS = np.arange(0, 360, 5.0)          # offshore 'from' direction bin centres (deg)
 MIN_EXIT_DEPTH = 60.0                      # rays leaving the map in shallow water (e.g. along
-                                           # Marin coast toward Pt Reyes) count as blocked          # offshore 'from' direction bin centres (deg)
+                                           # Marin coast toward Pt Reyes) count as blocked
 
-def _site_cluster(bathy, lat, lon, h_site, n=7, radius=150.0):
+def _site_cluster(bathy, lat, lon, h_site, n=8, radius=150.0):
     """A few grid points around the model point with similar depth, to average out
-    single-point caustics (rays focusing exactly on one spot)."""
+    single-point caustics (rays focusing exactly on one spot). On the fine grid a
+    ~60 m radius is about half a swell wavelength at 10 m depth."""
     x0, y0 = bathy.to_xy(lat, lon)
-    pts = [(x0, y0, h_site)]
+    pts = [(float(x0), float(y0), h_site)]
     for a in np.linspace(0, 2 * np.pi, n, endpoint=False):
         x, y = x0 + radius * np.cos(a), y0 + radius * np.sin(a)
         la, lo = bathy.to_ll(x, y)
         h = bathy.depth_at(float(la), float(lo))
         if abs(h - h_site) < 0.4 * h_site:
-            pts.append((x, y, h))
+            pts.append((float(x), float(y), h))
     return pts
 
 def smooth_circular(W, width_deg=15.0):
@@ -81,22 +88,42 @@ def smooth_circular(W, width_deg=15.0):
     F = np.fft.fft(np.fft.ifftshift(k))
     return np.real(np.fft.ifft(np.fft.fft(W, axis=-1) * F, axis=-1))
 
-def transfer_table(bathy, lat, lon, h_site, periods=PERIODS, dtheta=0.05, smooth=True):
+def trace_nested(coarse, fine, trc, trf, x, y, th):
+    """Backward-trace rays starting in the fine grid; rays that leave it in water continue
+    on the coarse grid. Returns the final travel angle, end point in coarse xy and status."""
+    if fine is None:
+        x, y, th, st, _ = trc.trace(x, y, th)
+        return x, y, th, st
+    xf, yf, thf, stf, _ = trf.trace(x, y, th, ds=8.0, max_steps=4000)
+    xe, ye = np.zeros_like(xf), np.zeros_like(yf)
+    st = np.zeros_like(stf)
+    ex = stf == 1
+    la, lo = fine.to_ll(xf[ex], yf[ex])
+    cx, cy = coarse.to_xy(la, lo)
+    x2, y2, th2, st2, _ = trc.trace(cx, cy, thf[ex].copy())
+    xe[ex], ye[ex], thf[ex], st[ex] = x2, y2, th2, st2
+    return xe, ye, thf, st
+
+def transfer_table(coarse, lat, lon, h_site, fine=None, periods=PERIODS, dtheta=0.05, smooth=True):
     """W[period, dir_bin]: energy transmitted from deep water (per unit offshore spectral
     density) to the site, including refraction, shadowing and shoaling.
-    Uses backward rays + conservation of S·c·cg along rays (Longuet-Higgins 1957)."""
-    pts = _site_cluster(bathy, lat, lon, h_site)
+    Uses backward rays + conservation of S·c·cg along rays (Longuet-Higgins 1957).
+    With `fine`, rays start on the ~10 m nearshore grid and hand off to the coarse grid."""
+    site_grid = fine or coarse
+    pts = _site_cluster(site_grid, lat, lon, h_site, radius=60.0 if fine is not None else 150.0)
     th0 = np.radians(np.arange(0, 360, dtheta))
     W = np.zeros((len(periods), DIR_BINS.size))
     for p, T in enumerate(periods):
-        tr = Tracer(bathy, T)
+        trc = Tracer(coarse, T)
+        trf = Tracer(fine, T) if fine is not None else None
         for x0, y0, h in pts:
-            x_end, y_end, th, status, _ = tr.trace(np.full(th0.size, x0), np.full(th0.size, y0), th0.copy())
+            x_end, y_end, th, status = trace_nested(coarse, fine, trc, trf,
+                                                    np.full(th0.size, x0), np.full(th0.size, y0), th0.copy())
             c_s, cg_s = c_cg(T, h)
             c_o = 9.81 * T / (2 * np.pi); cg_o = c_o / 2           # deep-water offshore
             ratio = (c_o * cg_o) / (c_s * cg_s)
-            ex, ey = np.clip(x_end, 0, bathy.width), np.clip(y_end, 0, bathy.height)
-            exit_depth = tr._interp(bathy.h, ex, ey)
+            ex, ey = np.clip(x_end, 0, coarse.width), np.clip(y_end, 0, coarse.height)
+            exit_depth = trc._interp(coarse.h, ex, ey)
             ok = (status == 1) & (exit_depth > MIN_EXIT_DEPTH)    # left the map in open water
             frm = compass_from(th[ok])
             k = np.round(frm / 5.0).astype(int) % DIR_BINS.size

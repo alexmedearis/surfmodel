@@ -1,10 +1,13 @@
-"""Forward refraction diagrams: parallel swell rays from offshore bending onto the coast."""
+"""Forward refraction diagrams on the ~90 m regional grid: parallel swell rays from offshore
+bending onto the Pacifica coast. (plot_components.py does this on the 10 m grids with live swells.)"""
 import numpy as np, matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from common import Bathy, SPOTS
+import config
+from common import Bathy
 from raytrace import Tracer
 
-b = Bathy()
+b = Bathy.coarse("bayarea")
+SPOTS = {s["name"]: (s["lat"], s["lon"]) for s in config.load_spots("bayarea", "spot")}
 SCENARIOS = [(295, 14, "NW groundswell 295° @ 14 s"), (200, 16, "S swell 200° @ 16 s")]
 ZOOM = dict(lat=(37.50, 37.70), lon=(-122.62, -122.46))
 
@@ -40,5 +43,5 @@ for ax, (frm, T, title) in zip(axes, SCENARIOS):
     ax.xaxis.set_major_locator(plt.MaxNLocator(4))
     ax.set_title(title + "\n(each line = one wave ray; dense = more energy, empty = shadow)", fontsize=10)
 fig.suptitle("Pacifica / Linda Mar refraction: why south swell doesn't wrap in", fontsize=12)
-fig.tight_layout(); fig.savefig("out/refraction_linda_mar.png", dpi=140)
+fig.tight_layout(); fig.savefig(f"{config.OUT}/refraction_linda_mar.png", dpi=140)
 print("saved")

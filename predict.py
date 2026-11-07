@@ -1,19 +1,37 @@
-"""Nowcast surf at each spot: live Point Reyes buoy spectrum x per-spot transfer table."""
-import json, sys, numpy as np, matplotlib; matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+"""Nowcast surf at each spot: live deep-water buoy spectrum x per-spot transfer table,
+broken down by swell system.
+
+  python predict.py [region]            default: bayarea
+  python predict.py [region] --what-if  also compare single clean swells from set directions
+"""
+import json, os, sys, numpy as np
+import config
 from common import c_cg
 from buoy import latest, mem
+from partition import partition, label
 
 M2FT = 3.281
-TBL = json.load(open("data/transfer_tables.json"))
-PER, DIRS = np.array(TBL["periods"], float), np.array(TBL["dir_bins"])
+DTH = np.radians(5.0)
 
-def W_at(Wtab, T):
+def load_tables(region=None, kind="spot"):
+    tabs = []
+    for s in config.load_spots(region, kind):
+        p = config.table_path(s["slug"])
+        if os.path.exists(p):
+            t = json.load(open(p)); t["W"] = np.array(t["W"]); tabs.append(t)
+    return tabs
+
+def W_at(tab, T):
     """Transfer row for period T (linear in frequency between table periods, clamped)."""
-    fq, f = 1 / PER, 1 / np.clip(T, PER.min(), PER.max())
-    j = np.clip(np.searchsorted(-fq, -f), 1, len(PER) - 1)     # fq is decreasing
+    per = np.array(tab["periods"], float); Wtab = tab["W"]
+    fq, f = 1 / per, 1 / np.clip(T, per.min(), per.max())
+    j = np.clip(np.searchsorted(-fq, -f), 1, len(per) - 1)     # fq is decreasing
     w = (fq[j - 1] - f) / (fq[j - 1] - fq[j])
     return (1 - w) * Wtab[j - 1] + w * Wtab[j]
+
+def offshore(spec, dirs):
+    """Offshore S(f, θ) in m²/Hz/rad from the buoy's directional moments."""
+    return spec["E"][:, None] * mem(spec["a1"], spec["b1"], spec["a2"], spec["b2"], dirs)
 
 def breaking_height(hs_site, T, h_site):
     """Rough breaker height: back out an equivalent deep-water height, then Komar & Gaudiano (1975)."""
@@ -21,31 +39,46 @@ def breaking_height(hs_site, T, h_site):
     h0 = hs_site / ks
     return 0.39 * 9.81 ** 0.2 * (T * h0 ** 2) ** 0.4
 
-def predict(spec, spot):
-    sp = TBL["spots"][spot]; Wtab = np.array(sp["W"])
-    D = mem(spec["a1"], spec["b1"], spec["a2"], spec["b2"], DIRS)        # (nf, ndir) per rad
-    S_off = spec["E"][:, None] * D                                       # m²/Hz/rad
-    dth = np.radians(5.0)
+def predict(spec, tab, parts=None):
+    dirs = np.array(tab["dir_bins"])
+    S_off = offshore(spec, dirs)
     T = 1 / spec["f"]
-    Wf = np.array([W_at(Wtab, t) for t in T])
-    E_site = (Wf * S_off).sum(1) * dth                                   # m²/Hz
+    S_site = np.array([W_at(tab, t) for t in T]) * S_off
+    E_site = S_site.sum(1) * DTH                                         # m²/Hz
+    df = spec["df"]
     swell = T >= 9
-    hs = 4 * np.sqrt((E_site * spec["df"]).sum())
-    hs_swell = 4 * np.sqrt((E_site[swell] * spec["df"][swell]).sum())
+    hs = 4 * np.sqrt((E_site * df).sum())
     tp = T[E_site.argmax()]
-    return dict(spot=spot, hs=hs, hs_swell=hs_swell, tp=tp, hb=breaking_height(hs, tp, sp["depth"]),
-                E_site=E_site, S_off=S_off)
+    comps = []
+    for p in parts or []:
+        e_off = (S_off * p["mask"] * df[:, None]).sum() * DTH
+        e_site = (S_site * p["mask"] * df[:, None]).sum() * DTH
+        comps.append(dict(label=label(p), hs_off=4 * np.sqrt(e_off), hs_site=4 * np.sqrt(e_site),
+                          share=e_site / max((E_site * df).sum(), 1e-12)))
+    return dict(slug=tab["slug"], name=tab["name"], hs=hs, hs_swell=4 * np.sqrt((E_site[swell] * df[swell]).sum()),
+                tp=tp, hb=breaking_height(hs, tp, tab["depth"]), depth=tab["depth"],
+                E_site=E_site, S_off=S_off, S_site=S_site, comps=comps)
 
-def report(spec):
-    print(f"Point Reyes buoy (CDIP 029) @ {spec['time']:%Y-%m-%d %H:%M} UTC: "
-          f"Hs {spec['hs']:.1f} m ({spec['hs']*M2FT:.0f} ft), Tp {spec['tp']:.0f}s, from {spec['dp']:.0f}°\n")
-    print(f"{'spot':12s} {'Hs@10m':>8s} {'swell':>7s} {'Tp':>5s} {'est. breakers':>14s}")
+def swells(spec, dirs=np.arange(0, 360, 5.0)):
+    return partition(offshore(spec, dirs), spec["f"], dirs, spec["df"], DTH)
+
+def report(spec, tabs):
+    print(f"Input buoy {spec.get('stn', '')} @ {spec['time']:%Y-%m-%d %H:%M} UTC: "
+          f"Hs {spec['hs']*M2FT:.1f} ft, Tp {spec['tp']:.0f}s, from {spec['dp']:.0f}°")
+    parts = swells(spec)
+    print("Swells offshore:")
+    for p in parts:
+        print(f"  {label(p):34s} {p['hs']*M2FT:5.1f} ft")
     res = []
-    for spot in TBL["spots"]:
-        r = predict(spec, spot); res.append(r)
-        print(f"{spot:12s} {r['hs']*M2FT:6.1f}ft {r['hs_swell']*M2FT:5.1f}ft {r['tp']:4.0f}s"
-              f"   ~{r['hb']*M2FT*0.8:.0f}-{r['hb']*M2FT*1.2:.0f} ft")
-    return res
+    for tab in tabs:
+        r = predict(spec, tab, parts); res.append(r)
+        print(f"\n{r['name']}  (model point {r['depth']:.0f} m deep):  est. breakers ~{r['hb']*M2FT*0.8:.0f}-{r['hb']*M2FT*1.2:.0f} ft"
+              f"  (Hs {r['hs']*M2FT:.1f} ft, Tp {r['tp']:.0f}s)")
+        for c in r["comps"]:
+            pct = c["hs_site"] / max(c["hs_off"], 1e-9)
+            print(f"  {c['label']:34s} {c['hs_off']*M2FT:5.1f} ft offshore -> {c['hs_site']*M2FT:5.1f} ft here"
+                  f"  ({pct:4.0%} of height, {c['share']:4.0%} of energy here)")
+    return res, parts
 
 def synthetic(hs, tp, frm, spread=20.0):
     """A clean single swell, for 'what if' scenarios (JONSWAP-ish shape, cos^2s spread)."""
@@ -60,11 +93,16 @@ def synthetic(hs, tp, frm, spread=20.0):
                 a2=np.full(64, m**4 * np.cos(2 * a)), b2=np.full(64, m**4 * np.sin(2 * a)))
 
 if __name__ == "__main__":
-    spec = latest()
-    report(spec)
-    print("\nWhat-if: same 2 m (6.6 ft) deep-water swell from different directions -> est. breakers (ft)")
-    scen = [(14, 300, "14s NW 300°"), (14, 270, "14s W 270°"), (16, 220, "16s SW 220°"), (17, 195, "17s S 195°")]
-    print(f"{'':12s}" + "".join(f"{s[2]:>14s}" for s in scen))
-    for spot in TBL["spots"]:
-        row = [predict(synthetic(2.0, tp, d), spot)["hb"] * M2FT for tp, d, _ in scen]
-        print(f"{spot:12s}" + "".join(f"{v:14.1f}" for v in row))
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    region = args[0] if args else "bayarea"
+    tabs = load_tables(region)
+    stn = config.REGIONS[region]["input_buoy"]
+    spec = latest(stn); spec["stn"] = stn
+    report(spec, tabs)
+    if "--what-if" in sys.argv:
+        print("\nWhat-if: same 2 m (6.6 ft) deep-water swell from different directions -> est. breakers (ft)")
+        scen = [(14, 300, "14s NW 300°"), (14, 270, "14s W 270°"), (16, 220, "16s SW 220°"), (17, 195, "17s S 195°")]
+        print(f"{'':14s}" + "".join(f"{s[2]:>14s}" for s in scen))
+        for tab in tabs:
+            row = [predict(synthetic(2.0, tp, d), tab)["hb"] * M2FT for tp, d, _ in scen]
+            print(f"{tab['name']:14s}" + "".join(f"{v:14.1f}" for v in row))
