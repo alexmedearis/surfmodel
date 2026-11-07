@@ -7,7 +7,7 @@ are merged into the neighbouring partition they touch most.
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-def partition(S, f, dirs, df, dth, min_frac=0.04, max_parts=5):
+def partition(S, f, dirs, df, dth, min_frac=0.04, min_swell_hs=0.3, max_parts=5):
     """S: (nf, nd) energy density [m²/Hz/rad] on 'from' directions `dirs` (deg, evenly spaced).
     Returns a list of dicts sorted by energy: mask, hs, tp, dp (deg), frac."""
     nf, nd = S.shape
@@ -31,14 +31,19 @@ def partition(S, f, dirs, df, dth, min_frac=0.04, max_parts=5):
 
     E = S * df[:, None] * dth                                 # m² per bin
     total = E.sum()
-    # merge small partitions into the neighbour they share the longest border with
+    # Merge small partitions into the neighbour they share the longest border with.
+    # A long-period swell is kept even when it is a small share of the total: a 1.5 ft
+    # south swell under a 12 ft NW swell is easy to miss and matters a lot for some spots.
     while True:
         ids = np.unique(lab)
         en = np.array([E[lab == i].sum() for i in ids])
-        small = [(e, i) for i, e in zip(ids, en) if e < min_frac * total]
-        if (not small and len(ids) <= max_parts) or len(ids) == 1:
+        tp = np.array([1 / f[np.where(lab == i, E, 0).sum(1).argmax()] for i in ids])
+        swell = (tp >= 10) & (4 * np.sqrt(en) >= min_swell_hs)
+        small = (en < min_frac * total) & ~swell
+        if (not small.any() and len(ids) <= max_parts) or len(ids) == 1:
             break
-        i = min(small)[1] if small else ids[en.argmin()]
+        pool = small if small.any() else ~swell if (~swell).any() else np.ones_like(swell)
+        i = ids[np.where(pool, en, np.inf).argmin()]
         m = lab == i
         nb = np.concatenate([lab[np.roll(m, s, a)] for s, a in ((1, 0), (-1, 0), (1, 1), (-1, 1))])
         nb = nb[nb != i]
