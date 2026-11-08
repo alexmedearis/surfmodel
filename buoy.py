@@ -86,6 +86,13 @@ def latest(stn="029", back=0):
 def history(stn="029", days=30):
     """All spectra from the last `days` days as arrays: time (n,), hs, tp, dp, f (nf,), df,
     and E, a1, b1, a2, b2 (n, nf)."""
+    if stn.startswith("ndbc:"):                       # NDBC realtime files hold ~45 days
+        times, by_time = _ndbc_all(stn[5:])
+        cut = times[0] - dt.timedelta(days=days)
+        specs = [_ndbc_spec(t, by_time) for t in sorted(t for t in times if t >= cut)]
+        nf = len(specs[-1]["f"]); specs = [x for x in specs if len(x["f"]) == nf]
+        return dict(time=np.array([x["time"].timestamp() for x in specs]), f=specs[-1]["f"], df=specs[-1]["df"],
+                    **{k: np.array([x[k] for x in specs]) for k in ("hs", "tp", "dp", "E", "a1", "b1", "a2", "b2")})
     url = BASE.format(stn=stn)
     dds = requests.get(url + ".dds", timeout=60).text
     n = int(re.search(r"waveTime\[waveTime = (\d+)\]", dds).group(1))

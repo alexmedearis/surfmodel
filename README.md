@@ -2,7 +2,7 @@
 
 Physics-based "spot filters" for California surf breaks, driven by live deep-water buoys
 (CDIP, or NOAA NDBC). Regions so far: SF Bay Area (checked against a nearshore buoy) and
-Santa Cruz / Monterey Bay (built, not yet checked). Set up to grow region by region.
+Santa Cruz / Monterey Bay (checked against a buoy inside the bay). Set up to grow region by region.
 
 **Pipeline:** NOAA seafloor depths (~90 m regional grid + ~10 m nearshore grid per spot)
 → wave ray tracing (refraction, headland shadows, shoaling) → per-spot transfer table
@@ -48,6 +48,12 @@ SF Bar buoy (CDIP 142, 16 m deep), predicted from Point Reyes (CDIP 029), 30 day
 RMSE 0.8 ft, correlation 0.87, bias −0.3 ft. Using the Point Reyes reading as-is would be off by 3.6 ft.
 SF Bar sits in open water, so this checks the regional part; it can't yet show whether the
 10 m grids are right inside coves like Linda Mar (both grids score about the same there).
+
+Monterey Canyon buoy (CDIP 156, 133 m deep, inside Monterey Bay), predicted from NOAA 46042
+(outside the bay), 30 days to 2026-11-08: RMSE 1.1 ft, correlation 0.82, bias −0.2 ft. Using the
+46042 reading as-is would be off by 2.9 ft (+2.5 ft bias), so the model captures the bay's shelter.
+Misses: ~3 ft low around Oct 24 (a swell the bay was more open to than the model thought) and
+2-4 ft high at the Nov 7-8 peak. Like SF Bar, this checks the regional grid, not the 10 m spot grids.
 
 ## Known limitations
 - Ray theory ignores diffraction, so it under-predicts energy leaking into sheltered corners.

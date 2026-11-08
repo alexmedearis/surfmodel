@@ -23,6 +23,7 @@ def main():
     region = args[0] if args else "bayarea"
     days = float(args[1]) if len(args) > 1 else 30
     stn_in = config.REGIONS[region]["input_buoy"]
+    name_in = f"NOAA {stn_in[5:]}" if stn_in.startswith("ndbc:") else f"CDIP {stn_in}"
     hin = buoy.history(stn_in, days)
     for tab in load_tables(region, kind="buoy"):
         hck = buoy.history(tab["station"], days)
@@ -38,10 +39,10 @@ def main():
         ok = np.abs(hin["time"][j] - hck["time"]) <= 1200
         obs = hck["hs"][ok]
         t = hck["time"][ok].astype("datetime64[s]")
-        print(f"{tab['name']} (CDIP {tab['station']}) vs model driven by CDIP {stn_in}: {ok.sum()} records, last {days:.0f} days")
+        print(f"{tab['name']} (CDIP {tab['station']}) vs model driven by {name_in}: {ok.sum()} records, last {days:.0f} days")
         fig, ax = plt.subplots(figsize=(11, 4))
         ax.plot(t, obs * M2FT, "k", lw=1.2, label=f"measured (CDIP {tab['station']})")
-        ax.plot(t, hin["hs"][j[ok]] * M2FT, color="0.6", lw=0.8, label=f"offshore input (CDIP {stn_in})")
+        ax.plot(t, hin["hs"][j[ok]] * M2FT, color="0.6", lw=0.8, label=f"offshore input ({name_in})")
         for (name, tb), col in zip(tables, ("#d9480f", "#1c7ed6")):
             pred = np.array([predict(buoy.at(hin, i), tb)["hs"] for i in j[ok]])
             s = stats(pred, obs)
