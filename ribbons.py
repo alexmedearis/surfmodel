@@ -281,7 +281,8 @@ def build(tab, spec, parts, coarse):
                 breakers=[round(r["hb"] * M2FT * 0.8), round(r["hb"] * M2FT * 1.2)],
                 hs_ft=round(r["hs"] * M2FT, 1), main=swells_out.index(main) if main else None,
                 views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),
-                           cove=dict(box=cove_box, land=fpoly, bands=fband, depth=fdepth)),
+                           cove=dict(box=cove_box, land=fpoly, bands=fband, depth=fdepth,
+                                     extent=[round(float(fx0)), round(float(fx1)), round(float(fy0)), round(float(fy1))])),
                 swells=swells_out)
 
 if __name__ == "__main__":
