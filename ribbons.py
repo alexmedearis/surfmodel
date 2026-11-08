@@ -191,9 +191,12 @@ def heights_along(x, y, frame, coarse, fine, T, h_off, h_site):
     return h_site + (h_off - h_site) * g
 
 def land_polygons(grid, frame, view, tol):
+    """Land as a list of shapes (each a list of rings, drawn even-odd so lakes and islands work),
+    depth bands (water deeper than 20, 50 and 100 m) the same way, and 10/20/50 m contour lines."""
     X, Y = frame.xy(*np.meshgrid(grid.lat, grid.lon, indexing="ij"))
     fig, ax = plt.subplots()
     cs = ax.contourf(X, Y, grid.z, levels=[0, 1e6])
+    cb = ax.contourf(X, Y, -grid.z, levels=[20, 50, 100, 1e6])
     cl = ax.contour(X, Y, -grid.z, levels=[10, 20, 50, 100])
     plt.close(fig)
     def simp(p):
@@ -201,11 +204,19 @@ def land_polygons(grid, frame, view, tol):
         for q in p[1:]:
             if np.hypot(*(q - keep[-1])) >= tol: keep.append(q)
         return np.round(np.array(keep)).astype(int).tolist()
-    polys = [simp(p) for path in cs.get_paths() for p in path.to_polygons() if len(p) > 3]
+    def shapes(paths):
+        out = []
+        for path in paths:
+            rings = [simp(p) for p in path.to_polygons() if len(p) > 3]
+            rings = [r for r in rings if len(r) > 2]
+            if rings: out.append(rings)
+        return out
+    land = shapes(cs.get_paths())
+    bands = [dict(depth=int(lev), shapes=shapes([path])) for lev, path in zip(cb.levels[:-1], cb.get_paths())]
     depth = {}
     for lev, segs in zip(cl.levels, cl.allsegs):
         depth[int(lev)] = [simp(s) for s in segs if len(s) > 3]
-    return polys, depth
+    return land, bands, depth
 
 def build(tab, spec, parts, coarse):
     fine = Bathy.fine(tab["slug"])
@@ -250,13 +261,15 @@ def build(tab, spec, parts, coarse):
         swells_out.append(item)
         print(f"  {item['label']:34s} {h_off:5.1f} -> {h_site:4.1f} ft, "
               f"{'blocked' if item['blocked'] else str(len(item['strands'])) + ' strand(s)'}", flush=True)
-    cpoly, cdepth = land_polygons(coarse, frame, COAST_VIEW, 60)
-    fpoly, fdepth = land_polygons(fine, frame, None, 10)
+    cpoly, cband, cdepth = land_polygons(coarse, frame, COAST_VIEW, 60)
+    fpoly, fband, fdepth = land_polygons(fine, frame, None, 10)
+    main = max(swells_out, key=lambda s: s["site_ft"], default=None)
     return dict(spot=tab["name"], slug=tab["slug"], depth=round(tab["depth"], 1),
                 time=spec["time"].strftime("%b %-d, %-I:%M %p UTC"), buoy=spec["stn"],
                 breakers=[round(r["hb"] * M2FT * 0.8), round(r["hb"] * M2FT * 1.2)],
-                views=dict(coast=dict(box=COAST_VIEW, land=cpoly, depth=cdepth),
-                           cove=dict(box=cove_box, land=fpoly, depth=fdepth)),
+                hs_ft=round(r["hs"] * M2FT, 1), main=swells_out.index(main) if main else None,
+                views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),
+                           cove=dict(box=cove_box, land=fpoly, bands=fband, depth=fdepth)),
                 swells=swells_out)
 
 if __name__ == "__main__":
