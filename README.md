@@ -14,6 +14,7 @@ python fetch_bathy.py fine            # ~10 m nearshore grid for each new spot i
 python build_tables.py                # ray-trace each new spot (~1-2 min each, in parallel)
 python predict.py                     # live nowcast, broken down by swell; --what-if for scenarios
 python plot_components.py             # today's swells traced into each spot -> out/components_*.png
+python ribbons.py                     # interactive swell-ribbon map per spot -> out/ribbons_*.html
 python validate.py bayarea 30         # check against nearshore buoys -> out/check_*.png
 python plot_filters.py                # spot filter heatmaps -> out/spot_filters_<region>.png
 ```
@@ -33,6 +34,7 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
 - `buoy.py`: CDIP fetch (latest and history) + Maximum Entropy directional spectrum
 - `partition.py`: splits a spectrum into separate swells (watershed partitioning)
 - `predict.py`: nowcast at each spot, per swell
+- `ribbons.py`, `ribbons_template.html`: consumer-style page showing each swell's real refracted path into a spot
 - `validate.py`: model vs nearshore buoys
 
 ## How well it does so far
