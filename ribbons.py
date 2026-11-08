@@ -131,7 +131,14 @@ def strands_for(coarse, fine, frame, tab, part, comp, view, ray_box=None, dtheta
         cx, cy = cx[:max(stop, 2)][::-1], cy[:max(stop, 2)][::-1]   # offshore -> spot
         a = np.radians(frm[r])
         dmean = np.degrees(np.arctan2((w[r] * np.sin(a)).sum(), (w[r] * np.cos(a)).sum())) % 360
-        out.append(dict(x=cx, y=cy, share=w[r].sum() / sum(w[q].sum() for q in runs), frm=dmean, rays=rays))
+        # direction the waves come from as they reach the spot (after all the bending): the
+        # backward rays' launch directions, weighted the same way
+        b = np.radians(compass_from(th0[r]))
+        C, S_ = (w[r] * np.cos(b)).sum() / w[r].sum(), (w[r] * np.sin(b)).sum() / w[r].sum()
+        arr = np.degrees(np.arctan2(S_, C)) % 360
+        arr_spread = np.degrees(np.sqrt(max(0.0, -2 * np.log(max(np.hypot(C, S_), 1e-9)))))   # circular std
+        out.append(dict(x=cx, y=cy, share=w[r].sum() / sum(w[q].sum() for q in runs), frm=dmean, rays=rays,
+                        arr=arr, arr_spread=arr_spread))
     return out
 
 def blocked_path(coarse, fine, frame, tab, part, view):
@@ -249,6 +256,19 @@ def coast_view(u, coarse, frame):
     cx = min(max(cx, gx0 + hx), gx1 - hx); cy = min(max(cy, gy0 + hy), gy1 - hy)   # stay inside the grid
     return tuple(int(round(v)) for v in (cx - hx, cx + hx, cy - hy, cy + hy))
 
+def shore_normal(fine, frame):
+    """Compass bearing pointing straight out to sea from the spot: away from the land within
+    ~900 m, each land direction counted once (the local beach and its headlands, not the
+    whole coastline)."""
+    v = np.zeros(2)
+    for b in np.radians(np.arange(0, 360, 2)):
+        for rad in (150, 300, 450, 600, 750, 900):
+            x, y = rad * np.sin(b), rad * np.cos(b)
+            if fine.depth_at(frame.lat + y / frame.my, frame.lon + x / frame.mx) <= 0.5:   # land
+                v += np.array([np.sin(b), np.cos(b)]) / rad
+                break                                            # nearest land along this bearing
+    return float(np.degrees(np.arctan2(-v[0], -v[1])) % 360)
+
 def direction_fan(tab, p, r, df):
     """How this swell's energy is spread over offshore directions, and how much of each direction
     reaches the spot, relative to the spot's most open direction at this period (1 = fully open)."""
@@ -283,7 +303,8 @@ def build(tab, spec, parts, coarse):
         h_off, h_site = c["hs_off"] * M2FT, c["hs_site"] * M2FT
         item = dict(label=label(p), short=f"{p['tp']:.0f}s {compass(p['dp'])}", dp=round(p["dp"]),
                     tp=round(p["tp"]), off_ft=round(h_off, 1), site_ft=round(h_site, 1), color=COLORS[k],
-                    blocked=bool(h_site < BLOCKED_FT), strands=[], fan=direction_fan(tab, p, r, df))
+                    blocked=bool(h_site < BLOCKED_FT), strands=[], fan=direction_fan(tab, p, r, df),
+                    wavelength=round(float(2 * np.pi / wavenumber(max(p["tp"], 3.0), tab["depth"])), 1))
         frms = []
         if not item["blocked"]:
             for s in strands_for(coarse, fine, frame, tab, p, c, COAST_VIEW, ray_box=cove_box):
@@ -293,7 +314,7 @@ def build(tab, spec, parts, coarse):
                 h = heights_along(s["x"], s["y"], frame, coarse, fine, max(p["tp"], 6), h_off * share, h_site * share)
                 item["strands"].append(dict(x=np.round(s["x"]).astype(int).tolist(), y=np.round(s["y"]).astype(int).tolist(),
                                             h=np.round(h, 2).tolist(), share=round(float(s["share"]), 2), frm=round(s["frm"]),
-                                            rays=s["rays"]))
+                                            rays=s["rays"], arr=round(float(s["arr"])), arr_spread=round(float(s["arr_spread"]), 1)))
                 frms.append(s["frm"])
         # If what gets in comes from well off the swell's main direction, the main direction
         # itself is blocked: draw it too, stopping at the coast.
@@ -317,7 +338,7 @@ def build(tab, spec, parts, coarse):
     return dict(spot=tab["name"], slug=tab["slug"], depth=round(tab["depth"], 1),
                 time=spec["time"].strftime("%b %-d, %-I:%M %p UTC"), buoy=spec["stn"],
                 buoy_label=f"NOAA buoy {spec['stn'][5:]}" if spec["stn"].startswith("ndbc:") else f"CDIP buoy {spec['stn']}",
-                dir_bins=tab["dir_bins"],
+                dir_bins=tab["dir_bins"], shore_normal=round(shore_normal(fine, frame)),
                 breakers=[round(r["hb"] * M2FT * 0.8), round(r["hb"] * M2FT * 1.2)],
                 hs_ft=round(r["hs"] * M2FT, 1), main=swells_out.index(main) if main else None,
                 views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),

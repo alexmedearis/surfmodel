@@ -15,6 +15,18 @@
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:760px;margin:0 auto;padding:20px 16px 40px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card+.card{margin-top:16px}
+.water h2{font-size:19px;font-weight:650;margin:0}
+.wsum p{margin:10px 0 0}
+.lineup-wrap{margin-top:14px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#2e6896}
+#lineup{display:block;width:100%;aspect-ratio:4/3}
+.lineup-ctl{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-top:10px}
+.togs{display:flex;flex-wrap:wrap;gap:6px}
+.tog{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px 4px 6px;border-radius:99px;border:1px solid var(--line);cursor:pointer;user-select:none}
+.tog input{accent-color:var(--sw);margin:0}
+.tog:has(input:not(:checked)){opacity:.5}
+.btns{display:flex;gap:6px}
+.btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 h1{font-size:24px;font-weight:650;margin:0;letter-spacing:-.01em}
 .sub{color:var(--muted);font-size:13px}
@@ -101,6 +113,18 @@ details.foot p{margin:8px 0 0}
     <p>Zoom in toward the spot and the map switches to a detailed 10 m depth grid, and thin colored lines appear:
       individual wave paths, so you can see them fan out or focus on the reef.</p>
   </details>
+</div>
+<div class="card water" id="water">
+  <h2>In the water</h2>
+  <p class="sub">What this mix of swells looks like at the break, from above, with the beach at the bottom.</p>
+  <div id="water-summary" class="wsum"></div>
+  <div class="lineup-wrap"><canvas id="lineup" aria-label="Animated view of the swells arriving at the break"></canvas></div>
+  <div class="lineup-ctl">
+    <div id="lineup-swells" class="togs"></div>
+    <div class="btns"><button id="lineup-play" class="btn">Pause</button><button id="lineup-speed" class="btn">Real speed</button></div>
+  </div>
+  <p class="note">Simplified: a straight beach on a smooth, sloping bottom. The angle and mix of swells come from the model;
+    where exactly it peaks depends on sandbars and reef, which it doesn't know. Turn swells off to see what each one adds.</p>
 </div>
 </main>
 <script>
@@ -470,6 +494,143 @@ document.getElementById("size").textContent=`${DATA.breakers[0]}–${DATA.breake
 document.getElementById("summary").innerHTML=summary();
 legend();render();
 addEventListener("resize",redraw);
+/* ---------- In the water: what the swell mix looks like at the break ---------- */
+const relAngle=(arr,sn)=>((arr-sn+540)%360)-180;          // + = from your left as you face the beach
+function arrivals(s){                                       // share-weighted arrival direction at the spot
+  const st=s.strands.filter(t=>t.arr!==undefined);if(!st.length)return null;
+  const C=st.reduce((a,t)=>a+t.share*Math.cos(t.arr*Math.PI/180),0),S=st.reduce((a,t)=>a+t.share*Math.sin(t.arr*Math.PI/180),0);
+  return (Math.atan2(S,C)*180/Math.PI+360)%360;
+}
+function waterSummary(){
+  const sn=DATA.shore_normal;if(sn===undefined)return"";
+  const live=DATA.swells.filter(s=>!s.blocked&&s.strands.length&&s.site_ft>=0.3);
+  if(!live.length)return"Nothing much is reaching the spot right now.";
+  const m=live.reduce((a,b)=>b.site_ft>a.site_ft?b:a),am=arrivals(m),a=relAngle(am,sn),side=a>0?"left":"right";
+  const out=[];
+  const bent=Math.abs(relAngle(am,m.dp));
+  let dir=`<b style="color:${m.color}">${name(m)}</b> reaches the break from the ${COMPASS[Math.round(am/22.5)%16]} (about ${Math.round(am)}°)${bent>30?`: it starts out from ${m.dp}° and bends about ${Math.round(bent)}° on the way in`:""}. `;
+  if(Math.abs(a)<10)dir+=`That's almost straight onto the beach, so expect A-frame peaks or close-outs rather than long peeling walls.`;
+  else if(Math.abs(a)<=55)dir+=`Facing the beach, it comes from your ${side} at about ${Math.round(Math.abs(a))}°, so the angle favors <b>${a>0?"rights":"lefts"}</b>.`;
+  else dir+=`It's wrapping in at a steep angle (${Math.round(Math.abs(a))}° from your ${side} as you face the beach), so it runs along the shore: long <b>${a>0?"rights":"lefts"}</b> if the bottom lets it peel.`;
+  if(m.strands.length>1){const d=m.strands.map(t=>t.arr);const sp=Math.max(...d)-Math.min(...d);
+    if(sp>12)dir+=` It arrives by ${m.strands.length} routes about ${Math.round(sp)}° apart, so the peaks shift around.`}
+  out.push(dir);
+  const others=live.filter(s=>s!==m),bigO=others.filter(s=>s.site_ft>=0.25*m.site_ft);
+  for(const s of bigO){const as=arrivals(s),d=Math.abs(relAngle(as,am));
+    out.push(`The <b style="color:${s.color}">${s.short}</b> (${fmt(s.site_ft)} ft here) ${d>20?`comes from a different angle (${Math.round(as)}°), so lines cross and you get shifty peaks`:s.tp<9?"lines up with it but adds bumps and texture on the face":"lines up with it and adds size"}.`)}
+  if(others.length>bigO.length)out.push(`${bigO.length?"The rest are":"The other swells are"} too small to notice much.`);
+  const share=m.site_ft**2/live.reduce((t,s)=>t+s.site_ft**2,0);
+  out.push(m.tp>=13&&share>0.7?`Mostly one clean ${m.tp}s groundswell: expect distinct sets with lulls between, and a lot of push for the size.`
+    :m.tp>=13?`A groundswell mixed with other swells: sets are less distinct and it can feel busier between them.`
+    :`Short-period swell: waves come more steadily, closer together and weaker than the size suggests.`);
+  return out.map(t=>`<p>${t}</p>`).join("");
+}
+
+// Sum of wave trains on a flat, straight beach, viewed from above with the open ocean at the top.
+function lineup(){
+  const cv=document.getElementById("lineup");if(!cv||DATA.shore_normal===undefined)return;
+  const sn=DATA.shore_normal,h=Math.max(DATA.depth||8,2),g=9.81;
+  const live=DATA.swells.map((s,i)=>({s,i})).filter(o=>!o.s.blocked&&o.s.strands.length&&o.s.site_ft>=0.3);
+  const on=new Set(live.map(o=>o.i));
+  const kOf=T=>{const w=2*Math.PI/T;let k=w*w/g/Math.sqrt(Math.tanh(w*w*h/g));for(let n=0;n<8;n++){const f=g*k*Math.tanh(k*h)-w*w,d=g*Math.tanh(k*h)+g*k*h/Math.cosh(k*h)**2;k-=f/d}return k};
+  let rng=7;const rnd=()=>((rng=(rng*16807)%2147483647)/2147483647);
+  const comps=[];
+  for(const {s,i} of live)for(const st of s.strands){
+    const n=5,sp=Math.max(st.arr_spread||0,s.tp>=13?3:7);
+    for(let j=0;j<n;j++){
+      const T=s.tp*(1+(rnd()-0.5)*(s.tp>=13?0.06:0.14)),k=kOf(T);
+      // travel bearing relative to "out to sea" (screen up); a bearing rel points to (sin rel, -cos rel) on screen
+      const trav=(st.arr+180+(j-(n-1)/2)/((n-1)/2)*sp-sn)*Math.PI/180;
+      comps.push({i,A:s.site_ft*Math.sqrt(st.share/n),kx:k*Math.sin(trav),ky:-k*Math.cos(trav),k,w:2*Math.PI/T,ph:rnd()*2*Math.PI});
+    }
+  }
+  const Lmax=Math.max(...live.map(o=>2*Math.PI/kOf(o.s.tp)),60);
+  const Wm=Math.max(320,2.4*Lmax),Hm=Wm*0.75;              // metres shown
+  const NX=168,NY=126,buf=document.createElement("canvas");buf.width=NX;buf.height=NY;
+  const bctx=buf.getContext("2d"),img=bctx.createImageData(NX,NY),ctx=cv.getContext("2d");
+  const xs=Float32Array.from({length:NX},(_,i)=>(i/(NX-1)-0.5)*Wm),ys=Float32Array.from({length:NY},(_,j)=>j/(NY-1)*Hm);
+  const beachY=0.86,breakY=0.62;                            // fractions of the height
+  let speed=1,playing=!matchMedia("(prefers-reduced-motion:reduce)").matches,t=0,last=null,visible=true;
+  const dark=()=>matchMedia("(prefers-color-scheme:dark)").matches&&document.documentElement.dataset.theme!=="light"||document.documentElement.dataset.theme==="dark";
+  function frame(){
+    const pal=dark()?{deep:[24,52,80],shal:[44,96,120],sand:[70,64,54],foam:[220,232,240]}:{deep:[46,104,150],shal:[96,170,190],sand:[226,214,184],foam:[255,255,255]};
+    const act=comps.filter(c=>on.has(c.i));
+    const tot=2.2*Math.sqrt(act.reduce((a,c)=>a+c.A*c.A/2,0))||1;        // ~2.2 x rms: crests land near +1
+    const kRef=act.length?act.reduce((a,c)=>c.A>a.A?c:a).k:0.05;
+    const cxr=new Float32Array(NX*act.length),cxi=new Float32Array(NX*act.length);
+    act.forEach((c,n)=>{for(let x=0;x<NX;x++){const p=c.kx*xs[x];cxr[n*NX+x]=Math.cos(p);cxi[n*NX+x]=Math.sin(p)}});
+    const d=img.data;
+    for(let y=0;y<NY;y++){
+      const fy=y/(NY-1);
+      if(fy>=beachY){for(let x=0;x<NX;x++){const o=4*(y*NX+x);d[o]=pal.sand[0];d[o+1]=pal.sand[1];d[o+2]=pal.sand[2];d[o+3]=255}continue}
+      const cyr=[],cyi=[];
+      for(const c of act){const p=c.ky*ys[y]-c.w*t+c.ph;cyr.push(c.A*Math.cos(p));cyi.push(c.A*Math.sin(p))}
+      const depthMix=fy/beachY;                            // shallower toward the beach
+      const base=pal.deep.map((v,k)=>v+(pal.shal[k]-v)*depthMix);
+      for(let x=0;x<NX;x++){
+        let eta=0,slope=0;
+        for(let n=0;n<act.length;n++){const ar=cxr[n*NX+x],ai=cxi[n*NX+x];eta+=ar*cyr[n]-ai*cyi[n];slope-=act[n].ky*(ar*cyi[n]+ai*cyr[n])}
+        const e=eta/tot,sl=slope/tot/kRef;                    // both about -1..1
+        let r=base[0],gg=base[1],b=base[2];
+        // real swell has sharp crests and wide flat troughs: light up just the top of each wave
+        const cr=Math.min(1,Math.max(0,(e-0.3)/0.45)),crest=cr*cr*(3-2*cr);
+        const lit=Math.max(-0.5,Math.min(0.75,0.22*e+0.55*crest-sl*0.06));
+        r+=lit*90;gg+=lit*90;b+=lit*90;
+        // whitewater: crests break once they reach the shallows
+        if(fy>breakY){const z=(fy-breakY)/(beachY-breakY),thr=0.75-0.6*z;
+          if(e>thr){const f=Math.min(1,(e-thr)*5);r+=(pal.foam[0]-r)*f;gg+=(pal.foam[1]-gg)*f;b+=(pal.foam[2]-b)*f}}
+        if(fy>beachY-0.025){const f=(fy-(beachY-0.025))/0.025*0.6;r+=(pal.foam[0]-r)*f;gg+=(pal.foam[1]-gg)*f;b+=(pal.foam[2]-b)*f}
+        const o=4*(y*NX+x);d[o]=r;d[o+1]=gg;d[o+2]=b;d[o+3]=255;
+      }
+    }
+    bctx.putImageData(img,0,0);
+    const W=cv.width,H=cv.height;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(buf,0,0,W,H);
+    overlay(W,H,act);
+  }
+  function overlay(W,H,act){
+    const s=W/600;ctx.save();ctx.font=`600 ${13*s}px -apple-system,BlinkMacSystemFont,sans-serif`;ctx.textBaseline="middle";
+    const pill=(txt,x,y,bg,fg)=>{const w=ctx.measureText(txt).width+16*s;ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(x-w/2,y-11*s,w,22*s,11*s);ctx.fill();ctx.fillStyle=fg;ctx.textAlign="center";ctx.fillText(txt,x,y)};
+    pill("Beach",W/2,H*(beachY+0.07),"rgba(0,0,0,.35)","#fff");
+    pill("Open ocean",W/2,16*s+4*s,"rgba(0,0,0,.35)","#fff");
+    // where each swell comes in from: arrows along the top edge
+    live.filter(o=>on.has(o.i)).forEach(({s:sw},k)=>{
+      const rel=(arrivals(sw)+180-sn)*Math.PI/180,dx=Math.sin(rel),dy=-Math.cos(rel);
+      const cx=W*(0.18+0.64*(live.length>1?k/(live.length-1):0.5)),cy=H*0.2,L=34*s;
+      ctx.strokeStyle=sw.color;ctx.fillStyle=sw.color;ctx.lineWidth=4*s;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(cx-dx*L,cy-dy*L);ctx.lineTo(cx+dx*L*0.6,cy+dy*L*0.6);ctx.stroke();
+      const hx=cx+dx*L,hy=cy+dy*L,an=Math.atan2(dy,dx);ctx.beginPath();ctx.moveTo(hx,hy);
+      ctx.lineTo(hx-12*s*Math.cos(an-0.5),hy-12*s*Math.sin(an-0.5));ctx.lineTo(hx-12*s*Math.cos(an+0.5),hy-12*s*Math.sin(an+0.5));ctx.closePath();ctx.fill();
+      pill(sw.short,cx-dx*L*1.2,cy-dy*L*1.2-16*s,sw.color,"#fff");
+    });
+    // north arrow: compass north relative to "out to sea = up"
+    const na=(0-sn)*Math.PI/180,nx=W-28*s,ny=28*s;          // north, relative to "out to sea = up"
+    ctx.fillStyle="rgba(255,255,255,.85)";ctx.beginPath();ctx.arc(nx,ny,16*s,0,7);ctx.fill();
+    ctx.translate(nx,ny);ctx.rotate(na);ctx.fillStyle="#1f1e1c";ctx.beginPath();ctx.moveTo(0,-11*s);ctx.lineTo(6*s,7*s);ctx.lineTo(0,3*s);ctx.lineTo(-6*s,7*s);ctx.closePath();ctx.fill();
+    ctx.restore();
+    // scale
+    ctx.save();const sc=Lmax>150?100:50,px=sc/Wm*W;ctx.fillStyle="rgba(255,255,255,.85)";ctx.beginPath();ctx.roundRect(10*s,H*beachY-34*s,px+20*s,26*s,6*s);ctx.fill();
+    ctx.strokeStyle="#1f1e1c";ctx.lineWidth=1.5*s;ctx.beginPath();ctx.moveTo(20*s,H*beachY-14*s);ctx.lineTo(20*s+px,H*beachY-14*s);ctx.stroke();
+    ctx.fillStyle="#1f1e1c";ctx.font=`${11*s}px -apple-system,sans-serif`;ctx.textAlign="center";ctx.fillText(`${sc} m`,20*s+px/2,H*beachY-24*s);ctx.restore();
+  }
+  function size(){const r=cv.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.width*0.75*dpr);frame()}
+  function loop(now){
+    if(last!==null&&playing&&visible)t+=Math.min((now-last)/1000,0.1)*speed;
+    last=now;if(playing&&visible)frame();requestAnimationFrame(loop);
+  }
+  // controls
+  const chips=document.getElementById("lineup-swells");
+  chips.innerHTML=live.map(({s,i})=>`<label class="tog" style="--sw:${s.color}"><input type="checkbox" checked data-i="${i}"><span>${s.short} · ${fmt(s.site_ft)} ft</span></label>`).join("");
+  chips.onchange=e=>{const i=+e.target.dataset.i;e.target.checked?on.add(i):on.delete(i);frame()};
+  const pb=document.getElementById("lineup-play"),sb=document.getElementById("lineup-speed");
+  const setPB=()=>{pb.textContent=playing?"Pause":"Play";pb.setAttribute("aria-pressed",!playing)};
+  pb.onclick=()=>{playing=!playing;setPB()};setPB();
+  sb.onclick=()=>{speed=speed===1?3:1;sb.textContent=speed===1?"Real speed":"3× speed"};
+  new IntersectionObserver(es=>{visible=es[0].isIntersecting}).observe(cv);
+  addEventListener("resize",size);size();requestAnimationFrame(loop);
+}
+document.getElementById("water-summary").innerHTML=waterSummary();
+lineup();
+
 </script>
 </body>
 </html>
