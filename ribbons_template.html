@@ -43,7 +43,7 @@ h1{font-size:24px;font-weight:650;margin:0;letter-spacing:-.01em}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .rows{margin-top:16px;display:grid;gap:8px}
-.row{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;transition:opacity .15s,border-color .15s}
+.row{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:transparent;color:inherit;font:inherit;text-align:left;width:100%;transition:opacity .15s,border-color .15s}
 .row:hover{border-color:var(--muted)}
 .row.on{border-color:var(--sw);box-shadow:inset 3px 0 0 var(--sw)}
 .row.dim{opacity:.45}
@@ -63,7 +63,7 @@ details.foot p{margin:8px 0 0}
   main{padding:12px 10px 32px}
   h1{font-size:21px}.big{font-size:28px}
   .hint{display:none}
-  .row{grid-template-columns:34px 1fr auto;gap:10px;padding:10px}
+  .row{grid-template-columns:44px 1fr auto;gap:10px;padding:10px}
   .num b{font-size:17px}
 }
 </style>
@@ -95,6 +95,9 @@ details.foot p{margin:8px 0 0}
     <p>A dashed line is a swell that's out there but misses this spot. It's drawn from the part of the swell aimed most
       directly at the spot, and stops at the ring, the closest that part ever gets. The dotted line shows the gap.
       Darker water is deeper; the thin lines are the 10, 20 and 50 m depth contours.</p>
+    <p>The small fan next to each swell shows its spread of directions offshore: the dashed outline is all of it,
+      the solid part is what reaches the spot. Tap a swell to see its fan over the map, with a grey ring marking the
+      directions that are open to the spot.</p>
     <p>Zoom in toward the spot and the map switches to a detailed 10 m depth grid, and thin colored lines appear:
       individual wave paths, so you can see them fan out or focus on the reef.</p>
   </details>
@@ -111,6 +114,13 @@ const COMPASS=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W
 const kind=s=>s.tp>=13?"groundswell":s.tp>=9?"swell":"wind swell";
 const name=s=>`${s.tp}s ${s.short.split(" ")[1]} ${kind(s)}`;
 const km=m=>m<1000?`${Math.round(m/50)*50} m`:`${(m/1000).toFixed(1)} km`;
+// directions holding the middle 80% of a swell's energy, e.g. "285–330°"
+function spread(s){
+  const F=s.fan,rel=F.dirs.map(d=>((d-s.dp+540)%360)-180),o=rel.map((r,i)=>i).sort((a,b)=>rel[a]-rel[b]);
+  const tot=F.off.reduce((a,b)=>a+b,0);let c=0,lo=null,hi=null;
+  for(const i of o){c+=F.off[i];if(lo===null&&c>=0.1*tot)lo=rel[i];if(hi===null&&c>=0.9*tot)hi=rel[i]}
+  return `±${Math.round((hi-lo)/2)}°`;
+}
 const fmt=v=>v>=10?Math.round(v):Math.round(v*10)/10;
 
 function status(s){
@@ -257,6 +267,19 @@ function draw(){
   });
 
   const G=gTop;
+  // focused swell: its spread of directions as a big fan over the spot, so you can see which
+  // part points at open water and which part points at the coast
+  if(focus!==null&&DATA.swells[focus].fan){
+    const s=DATA.swells[focus],R=px*Math.min(110,svg.clientWidth*0.28);
+    const win=s.fan.window||[],bins=DATA.dir_bins||[];
+    el("circle",{cx:0,cy:0,r:R,fill:"var(--halo)","fill-opacity":0.55,stroke:"var(--muted)","stroke-opacity":0.5,"stroke-width":px,"stroke-dasharray":`${px*3} ${px*3}`},G);
+    // the spot's open window at this period: a ring, solid where swell can get in
+    bins.forEach((d,i)=>{if((win[i]||0)<0.15)return;
+      const a0=(d-2.5)*Math.PI/180,a1=(d+2.5)*Math.PI/180,rr=R+px*5;
+      el("path",{d:`M${rr*Math.sin(a0)} ${-rr*Math.cos(a0)}A${rr} ${rr} 0 0 1 ${rr*Math.sin(a1)} ${-rr*Math.cos(a1)}`,fill:"none",stroke:"var(--text)","stroke-opacity":0.25+0.5*win[i],"stroke-width":px*4},G)});
+    el("path",{d:fanPts(s,R,0,0,"off"),fill:s.color,"fill-opacity":0.15,stroke:s.color,"stroke-width":px*1.5,"stroke-dasharray":`${px*4} ${px*3}`,"stroke-linejoin":"round"},G);
+    el("path",{d:fanPts(s,R,0,0,"open"),fill:s.color,"fill-opacity":0.85,stroke:s.color,"stroke-width":px*1.5,"stroke-linejoin":"round"},G);
+  }
   // spot marker
   el("circle",{cx:0,cy:0,r:px*7,fill:"var(--text)",class:"pulse"},G);
   el("circle",{cx:0,cy:0,r:px*6,fill:"var(--text)",stroke:"var(--halo)","stroke-width":px*2.5},G);
@@ -364,6 +387,29 @@ svg.addEventListener("click",e=>{                                 // tap a ribbo
   if(hit){const i=+hit.dataset.i;focus=focus===i?null:i;render()}
 });
 
+// A swell's spread of directions as a fan around a centre point, petals pointing where it comes FROM.
+// Outline = all of the swell offshore; solid = the part that reaches the spot. Radius ~ height.
+function fanPts(s,R,cx,cy,key){
+  const F=s.fan;if(!F||!F.dirs.length)return"";
+  const idx=F.dirs.map((d,i)=>i).sort((a,b)=>((F.dirs[a]-s.dp+540)%360)-((F.dirs[b]-s.dp+540)%360));
+  const pts=[[cx,cy]];
+  for(const i of idx){
+    const v=Math.sqrt(key==="open"?F.off[i]*F.open[i]:F.off[i]);          // radius ~ height, not energy
+    for(const db of [-2.5,2.5]){const b=(F.dirs[i]+db)*Math.PI/180;pts.push([cx+R*v*Math.sin(b),cy-R*v*Math.cos(b)])}
+  }
+  return "M"+pts.map(p=>p[0].toFixed(2)+" "+p[1].toFixed(2)).join("L")+"Z";
+}
+function fanSVG(s,size){
+  const r=size/2,R=r-3;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="spread of directions; filled part reaches the spot">
+    <circle cx="${r}" cy="${r}" r="${r-1}" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="${r}" y="8.5" font-size="7.5" text-anchor="middle" fill="var(--muted)">N</text>
+    <path d="${fanPts(s,R,r,r,"off")}" fill="${s.color}" fill-opacity=".14" stroke="${s.color}" stroke-opacity=".7" stroke-width="1" stroke-dasharray="2 2" stroke-linejoin="round"/>
+    <path d="${fanPts(s,R,r,r,"open")}" fill="${s.color}" stroke="${s.color}" stroke-width="1" stroke-linejoin="round"/>
+    <circle cx="${r}" cy="${r}" r="2.2" fill="var(--text)"/>
+  </svg>`;
+}
+
 function dial(s,size){
   const r=size/2,a=(s.dp-90)*Math.PI/180,len=r*0.78;
   const fx=r+Math.cos(a)*len,fy=r+Math.sin(a)*len,tx=r-Math.cos(a)*len*0.35,ty=r-Math.sin(a)*len*0.35;
@@ -385,9 +431,9 @@ function rows(){
     b.className="row"+(focus===i?" on":focus!==null?" dim":"");b.style.setProperty("--sw",s.color);
     const pct=Math.round(100*s.site_ft/Math.max(s.off_ft,0.01)),st=status(s);
     const chipCol=s.blocked?"var(--muted)":s.color;
-    b.innerHTML=`${dial(s,small?34:40)}
+    b.innerHTML=`${s.fan?fanSVG(s,small?44:52):dial(s,small?34:40)}
       <span><span class="name">${name(s)}</span>${st.chip?`<span class="chip" style="color:${chipCol};background:color-mix(in srgb, ${chipCol} 14%, transparent)">${st.chip}</span>`:""}
-      <div class="meta">from ${s.dp}° (${COMPASS[Math.round(s.dp/22.5)%16]}) · ${fmt(s.off_ft)} ft offshore</div>
+      <div class="meta">from ${s.dp}° (${COMPASS[Math.round(s.dp/22.5)%16]})${s.fan?` · spread ${spread(s)}`:""} · ${fmt(s.off_ft)} ft offshore</div>
       <div class="track" title="faint: offshore height · solid: height at the spot">
         <i style="width:${100*s.off_ft/maxOff}%;background:${s.color};opacity:.22"></i>
         <i style="width:${Math.max(100*s.site_ft/maxOff,1)}%;background:${s.color}"></i></div>
@@ -400,7 +446,8 @@ function rows(){
 
 function legend(){
   const hasBlocked=DATA.swells.some(s=>s.blocked_path);
-  document.getElementById("legend").innerHTML=
+  const fanNote=focus!==null&&DATA.swells[focus].fan?`<span><svg width="22" height="14"><path d="M11 13L3 3A11 11 0 0 1 19 3Z" fill="var(--muted)" fill-opacity=".2" stroke="var(--muted)" stroke-dasharray="2 2"/><path d="M11 13L8 2A11 11 0 0 1 14 2Z" fill="var(--muted)"/></svg>Fan: the directions in this swell. Solid = reaches ${DATA.spot}, outline only = blocked. Grey ring = directions open to ${DATA.spot}.</span>`:"";
+  document.getElementById("legend").innerHTML=fanNote+
     `<span><svg width="26" height="10"><path d="M1 3L25 1V9L1 7Z" fill="var(--muted)" fill-opacity=".5"/></svg>Swell reaching the spot · width = height</span>`+
     (hasBlocked?`<span><svg width="26" height="10"><path d="M1 5H25" stroke="var(--muted)" stroke-width="2" stroke-dasharray="4 4"/></svg>Swell that misses the spot (ring = closest it gets)</span>`:"");
 }
@@ -415,10 +462,10 @@ function summary(){
   return txt;
 }
 
-function render(){draw();rows()}
+function render(){draw();rows();legend()}
 document.title=`${DATA.spot} swells`;
 document.getElementById("spot").textContent=DATA.spot;
-document.getElementById("when").textContent=`${DATA.time} · buoy ${DATA.buoy}`;
+document.getElementById("when").textContent=`${DATA.time} · ${DATA.buoy_label||"buoy "+DATA.buoy}`;
 document.getElementById("size").textContent=`${DATA.breakers[0]}–${DATA.breakers[1]} ft`;
 document.getElementById("summary").innerHTML=summary();
 legend();render();

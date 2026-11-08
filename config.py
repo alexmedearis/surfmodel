@@ -17,10 +17,15 @@ REGIONS = {
         bbox=(37.0, 38.0, -123.40, -122.35),          # lat_s, lat_n, lon_w, lon_e
         input_buoy="029",                             # Point Reyes (deep water, unsheltered)
     ),
+    "santacruz": dict(
+        name="Santa Cruz / Monterey Bay",
+        bbox=(36.45, 37.25, -122.65, -121.75),
+        input_buoy="ndbc:46042",                      # NOAA Monterey, ~1,700 m deep, outside the bay
+    ),                                                # (CDIP 156 sits inside the bay, already sheltered)
     # Planned. Each needs its coarse grid fetched (fetch_bathy.py coarse <region>) and spots added.
     # SoCal needs a large domain so the Channel Islands' shadows are inside it.
     "northcoast": dict(name="North Coast", bbox=(39.4, 41.2, -124.90, -123.60), input_buoy="094"),
-    "central":    dict(name="Santa Cruz / Monterey", bbox=(36.2, 37.2, -122.60, -121.75), input_buoy="156"),
+
     "slo":        dict(name="San Luis Obispo", bbox=(34.6, 35.8, -121.60, -120.50), input_buoy="222"),
     "socal":      dict(name="Southern California", bbox=(32.4, 34.6, -121.00, -117.10), input_buoy="071"),
 }

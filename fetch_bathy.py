@@ -21,7 +21,13 @@ def fetch(lat_s, lat_n, lon_w, lon_e, res, out, svc="DEM_all"):
     r = requests.get(SERVICE.format(svc=svc), params=p, timeout=300)
     r.raise_for_status()
     z = np.array(Image.open(io.BytesIO(r.content)), dtype=np.float32)[::-1]   # row 0 = south
-    z[~np.isfinite(z) | (np.abs(z) > 1e5)] = 1.0                               # no data -> land
+    junk = ~np.isfinite(z) | (np.abs(z) > 12000)       # deeper than any ocean or higher than any land here
+    if junk.mean() > 0.001 and svc != "DEM_all":
+        # The Coastal Relief Model service returns corrupt pixels for some areas (e.g. Monterey Bay);
+        # the combined best-available mosaic is clean there, so use it instead.
+        print(f"  {svc}: {junk.mean():.1%} corrupt pixels, retrying with DEM_all", file=sys.stderr)
+        return fetch(lat_s, lat_n, lon_w, lon_e, res, out, svc="DEM_all")
+    z[junk] = 1.0                                                              # no data -> land
     lat = lat_s + (np.arange(ny) + 0.5) * (lat_n - lat_s) / ny
     lon = lon_w + (np.arange(nx) + 0.5) * (lon_e - lon_w) / nx
     os.makedirs(os.path.dirname(out), exist_ok=True)

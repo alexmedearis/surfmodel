@@ -2,7 +2,8 @@
 into a spot, drawn as a ribbon whose width is the swell's height along the way.
 
   python ribbons.py [slug ...]                  -> out/ribbons_<slug>.html (open in a browser)
-  python ribbons.py --hours-ago 24 linda-mar    replay an earlier buoy reading (half-hour steps)
+  python ribbons.py --at "2026-11-07 06:00"     replay the buoy reading nearest that UTC time
+  python ribbons.py --hours-ago 24 linda-mar    or one about that long ago
 
 How a ribbon is built:
   1. Trace wave rays backward from the spot at the swell's peak period (10 m grid near
@@ -22,11 +23,12 @@ import matplotlib.pyplot as plt
 import config
 from common import Bathy, wavenumber
 from raytrace import Tracer, compass_from, MIN_EXIT_DEPTH
-from buoy import latest
-from predict import load_tables, predict, swells, M2FT
+import datetime as dt
+from buoy import latest, nearest
+from predict import load_tables, predict, swells, W_at, M2FT
 from partition import label, compass
 
-COAST_VIEW = (-15000, 4000, -10000, 10000)       # x0, x1, y0, y1 in metres from the spot
+VIEW_SEAWARD, VIEW_HALF = 5500, (9500, 10000)    # coast map: centred this far out to sea, ~19 x 20 km
 COLORS = ["#1D9E75", "#D85A30", "#7F77DD", "#BA7517", "#D4537E"]
 BLOCKED_FT = 0.5                                  # less than this arriving -> "blocked"
 
@@ -227,25 +229,61 @@ def land_polygons(grid, frame, view, tol):
         depth[int(lev)] = [simp(s) for s in segs if len(s) > 3]
     return land, bands, depth
 
+def seaward(coarse, frame):
+    """Unit vector (east, north) from the spot toward open water: which way the
+    coast faces, snapped to N/E/S/W. Weighted by depth on rings 2-6 km out."""
+    v = np.zeros(2)
+    for rad in (2000, 4000, 6000):
+        for b in np.radians(np.arange(0, 360, 10)):
+            x, y = rad * np.sin(b), rad * np.cos(b)
+            d = coarse.depth_at(frame.lat + y / frame.my, frame.lon + x / frame.mx)
+            v += np.clip(float(np.squeeze(d)), 0, 200) * np.array([np.sin(b), np.cos(b)])
+    a = np.round(np.arctan2(v[0], v[1]) / (np.pi / 2)) * (np.pi / 2)
+    return np.array([np.sin(a), np.cos(a)])
+
+def coast_view(u, coarse, frame):
+    """Coast map box (x0, x1, y0, y1, metres from the spot): mostly sea, a little land, north up."""
+    hx, hy = VIEW_HALF if abs(u[0]) >= abs(u[1]) else VIEW_HALF[::-1]
+    cx, cy = VIEW_SEAWARD * u
+    gx0, gy0 = frame.xy(coarse.lat[0], coarse.lon[0]); gx1, gy1 = frame.xy(coarse.lat[-1], coarse.lon[-1])
+    cx = min(max(cx, gx0 + hx), gx1 - hx); cy = min(max(cy, gy0 + hy), gy1 - hy)   # stay inside the grid
+    return tuple(int(round(v)) for v in (cx - hx, cx + hx, cy - hy, cy + hy))
+
+def direction_fan(tab, p, r, df):
+    """How this swell's energy is spread over offshore directions, and how much of each direction
+    reaches the spot, relative to the spot's most open direction at this period (1 = fully open)."""
+    dirs = np.array(tab["dir_bins"], float)
+    off = (r["S_off"] * p["mask"] * df).sum(0)
+    site = (r["S_site"] * p["mask"] * df).sum(0)
+    Wp = W_at(tab, p["tp"])
+    ref = np.percentile(Wp[Wp > 0], 95) if (Wp > 0).any() else 1.0
+    frac = np.where(off > 0, site / np.maximum(off, 1e-12) / ref, 0)
+    keep = off >= 0.02 * off.max()
+    return dict(dirs=dirs[keep].astype(int).tolist(), off=np.round(off[keep] / off.max(), 3).tolist(),
+                open=np.round(np.clip(frac[keep], 0, 1), 3).tolist(),
+                window=np.round(np.clip(Wp / ref, 0, 1), 2).tolist())
+
 def build(tab, spec, parts, coarse):
     fine = Bathy.fine(tab["slug"])
     frame = Frame(tab["lat"], tab["lon"])
     r = predict(spec, tab, parts)
     df = spec["df"][:, None]
     swells_out = []
-    # close-up view: the 10 m grid, trimmed on the land side so the water fills most of it
+    u = seaward(coarse, frame)
+    COAST_VIEW = coast_view(u, coarse, frame)
+    # close-up view: most of the 10 m grid, nudged seaward so the water fills most of it
     fx0, fy0 = frame.xy(fine.lat[0], fine.lon[0]); fx1, fy1 = frame.xy(fine.lat[-1], fine.lon[-1])
     span = min(float(fy1 - fy0), float(fx1 - fx0)) * 0.8
-    cx0 = float(fx0); cx1 = min(float(fx1), cx0 + span)
-    cy0 = max(float(fy0), -span / 2); cy1 = min(float(fy1), span / 2)
-    cove_box = [round(cx0), round(cx1), round(cy0), round(cy1)]
+    ccx, ccy = u * span * 0.05
+    cove_box = [round(max(float(fx0), ccx - span / 2)), round(min(float(fx1), ccx + span / 2)),
+                round(max(float(fy0), ccy - span / 2)), round(min(float(fy1), ccy + span / 2))]
     shown = [(p, c) for p, c in zip(parts, r["comps"]) if p["tp"] >= 4 and p["hs"] * M2FT >= 1.0][:4]
     for k, (p, c) in enumerate(shown):
         p = dict(p, S=r["S_off"] * df)
         h_off, h_site = c["hs_off"] * M2FT, c["hs_site"] * M2FT
         item = dict(label=label(p), short=f"{p['tp']:.0f}s {compass(p['dp'])}", dp=round(p["dp"]),
                     tp=round(p["tp"]), off_ft=round(h_off, 1), site_ft=round(h_site, 1), color=COLORS[k],
-                    blocked=bool(h_site < BLOCKED_FT), strands=[])
+                    blocked=bool(h_site < BLOCKED_FT), strands=[], fan=direction_fan(tab, p, r, df))
         frms = []
         if not item["blocked"]:
             for s in strands_for(coarse, fine, frame, tab, p, c, COAST_VIEW, ray_box=cove_box):
@@ -278,6 +316,8 @@ def build(tab, spec, parts, coarse):
     main = max(swells_out, key=lambda s: s["site_ft"], default=None)
     return dict(spot=tab["name"], slug=tab["slug"], depth=round(tab["depth"], 1),
                 time=spec["time"].strftime("%b %-d, %-I:%M %p UTC"), buoy=spec["stn"],
+                buoy_label=f"NOAA buoy {spec['stn'][5:]}" if spec["stn"].startswith("ndbc:") else f"CDIP buoy {spec['stn']}",
+                dir_bins=tab["dir_bins"],
                 breakers=[round(r["hb"] * M2FT * 0.8), round(r["hb"] * M2FT * 1.2)],
                 hs_ft=round(r["hs"] * M2FT, 1), main=swells_out.index(main) if main else None,
                 views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),
@@ -287,21 +327,27 @@ def build(tab, spec, parts, coarse):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    back = 0
+    when = None
+    if "--at" in args:                                 # e.g. --at "2026-11-07 06:00" (UTC)
+        i = args.index("--at"); when = dt.datetime.fromisoformat(args[i + 1]).replace(tzinfo=dt.timezone.utc); del args[i:i + 2]
     if "--hours-ago" in args:                          # e.g. --hours-ago 24 to replay yesterday
-        i = args.index("--hours-ago"); back = int(float(args[i + 1]) * 2); del args[i:i + 2]
+        i = args.index("--hours-ago")
+        when = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=float(args[i + 1])); del args[i:i + 2]
     slugs = args
-    region = "bayarea"
-    stn = config.REGIONS[region]["input_buoy"]
-    spec = latest(stn, back=back); spec["stn"] = stn
-    parts = swells(spec)
-    coarse = Bathy.coarse(region)
+    spots = [s for s in config.load_spots(kind="spot") if not slugs or s["slug"] in slugs]
     tpl = open(os.path.join(config.HERE, "ribbons_template.html")).read()
-    for tab in load_tables(region):
-        if slugs and tab["slug"] not in slugs:
+    for region in dict.fromkeys(s["region"] for s in spots):
+        tabs = [t for t in load_tables(region) if t["slug"] in {s["slug"] for s in spots}]
+        if not tabs:
             continue
-        print(tab["name"], flush=True)
-        data = build(tab, spec, parts, coarse)
-        out = os.path.join(config.OUT, f"ribbons_{tab['slug']}.html")
-        open(out, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
-        print("  saved", os.path.relpath(out, config.HERE))
+        stn = config.REGIONS[region]["input_buoy"]
+        spec = nearest(stn, when) if when else latest(stn); spec["stn"] = stn
+        print(f"{config.REGIONS[region]['name']}: buoy {stn} at {spec['time']:%Y-%m-%d %H:%M} UTC", flush=True)
+        parts = swells(spec)
+        coarse = Bathy.coarse(region)
+        for tab in tabs:
+            print(tab["name"], flush=True)
+            data = build(tab, spec, parts, coarse)
+            out = os.path.join(config.OUT, f"ribbons_{tab['slug']}.html")
+            open(out, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
+            print("  saved", os.path.relpath(out, config.HERE))
