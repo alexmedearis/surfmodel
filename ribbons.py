@@ -178,6 +178,15 @@ def blocked_path(coarse, fine, frame, tab, part, view):
         px, py, hit = px[:first_out[0] + 1], py[:first_out[0] + 1], False
     return px, py, bool(hit)
 
+def miss_point(px, py):
+    """Where a blocked swell comes closest to the spot (the frame origin). The path is cut
+    there, so the map shows the swell heading for the spot and missing it.
+    Returns (index, distance m, compass side of the spot, ends_on_coast)."""
+    d = np.hypot(px, py)
+    k = int(d.argmin())
+    side = compass(np.degrees(np.arctan2(px[k], py[k])) % 360)
+    return k, float(d[k]), side, k >= len(px) - 3
+
 def heights_along(x, y, frame, coarse, fine, T, h_off, h_site):
     """Display height along a centre line: offshore height in deep water, easing to the
     arriving height as the water shoals (weighted by tanh(kh), 1 in deep water)."""
@@ -256,8 +265,11 @@ def build(tab, spec, parts, coarse):
         if item["blocked"] or not item["strands"]:
             x, y, hit = blocked_path(coarse, fine, frame, tab, p, COAST_VIEW)
             if len(x) > 2:
-                item["blocked_path"] = dict(x=np.round(x).astype(int).tolist(), y=np.round(y).astype(int).tolist(),
-                                            hits_coast=hit)
+                k, dist, side, at_coast = miss_point(x, y)
+                k = max(k, 3)
+                item["blocked_path"] = dict(x=np.round(x[:k + 1]).astype(int).tolist(),
+                                            y=np.round(y[:k + 1]).astype(int).tolist(),
+                                            hits_coast=bool(hit and at_coast), miss_m=round(dist), side=side)
         swells_out.append(item)
         print(f"  {item['label']:34s} {h_off:5.1f} -> {h_site:4.1f} ft, "
               f"{'blocked' if item['blocked'] else str(len(item['strands'])) + ' strand(s)'}", flush=True)
