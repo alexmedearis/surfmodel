@@ -19,6 +19,8 @@ python forecast.py santacruz          # NOAA WaveWatch III swell forecast at the
 python ribbons.py                     # interactive swell-ribbon map + 7-day forecast per spot -> out/ribbons_*.html
 python ribbons.py --at "2026-11-07 06:00" stinson   # same, for the buoy reading nearest a UTC time
 python validate.py bayarea 30         # check against nearshore buoys -> out/check_*.png
+python forecast_log.py                # record every forecast run still online (GitHub Actions does this every 6 h)
+python score_forecast.py              # score the logged forecasts against the buoys, by days ahead
 python plot_filters.py                # spot filter heatmaps -> out/spot_filters_<region>.png
 ```
 
@@ -45,6 +47,9 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
 - `ribbons.py`, `ribbons_template.html`: consumer-style page showing each swell's real refracted path into a spot,
   on a zoomable map, with a fan per swell showing which of its directions reach the spot
 - `validate.py`: model vs nearshore buoys
+- `forecast_log.py`, `score_forecast.py`, `.github/workflows/forecast-log.yml`: forecast record and scoring.
+  NOAA keeps only ~2 days of runs, so a GitHub Action logs each run (and recent buoy readings) to
+  `data/forecast_log/` every 6 hours and commits it. Each run is scaled to the buoy reading from when it came out.
 
 ## How well it does so far
 SF Bar buoy (CDIP 142, 16 m deep), predicted from Point Reyes (CDIP 029), 30 days to 2026-11-07:
@@ -64,11 +69,11 @@ WaveWatch III came in 20-30% low offshore at 46042 during the Nov 7-8 peak. Scal
 at the start (correction fading over ~24 h) brought CDIP 156 errors from 2.1 to 0.9 ft RMSE on day 1 and
 from 1.4 to 0.9 ft on days 2-3. At SF Bar it was already good (1.0-1.2 ft; WaveWatch III's own nearshore
 point there: 2.2 ft), and the scaling made it slightly worse (1.2-1.4 ft), because there WaveWatch III's low
-bias had been cancelling a small high bias of ours. Needs a longer record.
+bias had been cancelling a small high bias of ours. Needs a longer record: that's what the forecast log is for (`score_forecast.py`).
 
 ## Known limitations
 - Ray theory ignores diffraction, so it under-predicts energy leaking into sheltered corners.
   The 10 m grids are smoothed to ~30 m because finer features don't bend swell-length waves.
 - No wind, tide, currents or sandbars. Breaker heights use a generic formula and are **uncalibrated**.
 - The forecast is swell only (no wind or tide yet). WaveWatch III's 10° direction bins are coarser than a
-  buoy's, and NOAA keeps only ~2 days of runs online, so scoring the forecast means logging it ourselves.
+  buoy's, and NOAA keeps only ~2 days of runs online, so scoring the forecast relies on our own log (`forecast_log.py`).

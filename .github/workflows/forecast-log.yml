@@ -1,0 +1,39 @@
+# Logs every NOAA WaveWatch III forecast run (they're only online for ~2 days) and recent
+# buoy readings, so forecasts can be scored later with score_forecast.py.
+name: Log forecasts
+
+on:
+  schedule:
+    - cron: "40 5,11,17,23 * * *"     # ~5.5 h after each run's nominal time (00, 06, 12, 18 UTC)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forecast-log
+  cancel-in-progress: false
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: .github/workflows/forecast-log.yml
+      - run: pip install numpy scipy requests
+      - run: python forecast_log.py
+      - run: python score_forecast.py
+      - name: Commit the log
+        run: |
+          git config user.name "forecast-log bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/forecast_log
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -m "Forecast log $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase -q origin "${GITHUB_REF_NAME}"
+          git push -q origin "HEAD:${GITHUB_REF_NAME}"
