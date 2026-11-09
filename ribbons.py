@@ -26,7 +26,7 @@ from common import Bathy, wavenumber
 from raytrace import Tracer, compass_from, MIN_EXIT_DEPTH
 import datetime as dt
 from buoy import latest, nearest
-from predict import load_tables, predict, swells, W_at, M2FT, surf_ft
+from predict import load_tables, predict, swells, W_at, M2FT, surf_ft, calibration
 from partition import label, compass
 import forecast, lineup as LU, base64
 
@@ -292,7 +292,7 @@ def forecast_series(tab, fc):
         r = predict(s, tab, parts)
         sw = sorted(((c["hs_site"] * M2FT, c["hs_off"] * M2FT, p) for p, c in zip(parts, r["comps"])),
                     key=lambda x: -x[0])
-        hours.append(dict(t=int(s["time"].timestamp()), lo=round(surf_ft(r["hb"])[0], 1), hi=round(surf_ft(r["hb"])[1], 1),
+        hours.append(dict(t=int(s["time"].timestamp()), lo=round(surf_ft(r["hb"], tab["slug"])[0], 1), hi=round(surf_ft(r["hb"], tab["slug"])[1], 1),
                           off=round(s["hs"] * M2FT, 1), tp=round(r["tp"]),
                           sw=[[f"{p['tp']:.0f}s {compass(p['dp'])}", round(h, 1), round(o, 1), round(p["dp"])]
                               for h, o, p in sw[:3] if o >= 0.8]))
@@ -398,7 +398,7 @@ def build(tab, spec, parts, coarse, fc=None):
                 time=spec["time"].strftime("%b %-d, %-I:%M %p UTC"), buoy=spec["stn"],
                 buoy_label=f"NOAA buoy {spec['stn'][5:]}" if spec["stn"].startswith("ndbc:") else f"CDIP buoy {spec['stn']}",
                 dir_bins=tab["dir_bins"], shore_normal=round(shore_normal(fine, frame)),
-                breakers=[round(v) for v in surf_ft(r["hb"])],
+                breakers=[round(v) for v in surf_ft(r["hb"], tab["slug"])], calibration=calibration(tab["slug"]),
                 hs_ft=round(r["hs"] * M2FT, 1), main=swells_out.index(main) if main else None,
                 views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),
                            cove=dict(box=cove_box, land=fpoly, bands=fband, depth=fdepth,

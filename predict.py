@@ -42,9 +42,22 @@ def offshore(spec, dirs):
 # biggest 10%, ~1.25x that for a Rayleigh height distribution). Not yet calibrated against observations.
 SURF_RANGE = (1.0, 1.25)
 
-def surf_ft(hb):
-    """(low, high) surf height in feet from the significant breaker height in metres."""
-    return tuple(hb * M2FT * k for k in SURF_RANGE)
+_CAL = None
+def calibration(slug):
+    """Per-spot correction fitted from logged sessions (calibrate.py): dict(factor, n), or None."""
+    global _CAL
+    if _CAL is None:
+        p = os.environ.get("SURF_CALIBRATION", os.path.join(config.DATA, "calibration.json"))
+        _CAL = json.load(open(p)).get("spots", {}) if os.path.exists(p) else {}
+    c = _CAL.get(slug)
+    return c if c and c.get("factor", 1.0) != 1.0 else None
+
+def surf_ft(hb, slug=None):
+    """(low, high) surf height in feet from the significant breaker height in metres,
+    with the spot's session calibration applied when it has one."""
+    c = calibration(slug) if slug else None
+    f = c["factor"] if c else 1.0
+    return tuple(hb * M2FT * k * f for k in SURF_RANGE)
 
 def breaking_height(hs_site, T, h_site):
     """Significant breaker height (m): back out an equivalent deep-water height, then
@@ -87,7 +100,7 @@ def report(spec, tabs):
     res = []
     for tab in tabs:
         r = predict(spec, tab, parts); res.append(r)
-        print(f"\n{r['name']}  (model point {r['depth']:.0f} m deep):  surf ~{surf_ft(r['hb'])[0]:.0f}-{surf_ft(r['hb'])[1]:.0f} ft"
+        print(f"\n{r['name']}  (model point {r['depth']:.0f} m deep):  surf ~{surf_ft(r['hb'], r['slug'])[0]:.0f}-{surf_ft(r['hb'], r['slug'])[1]:.0f} ft"
               f"  (Hs {r['hs']*M2FT:.1f} ft, Tp {r['tp']:.0f}s)")
         for c in r["comps"]:
             pct = c["hs_site"] / max(c["hs_off"], 1e-9)

@@ -522,6 +522,7 @@ document.title=`${DATA.spot} swells`;
 document.getElementById("spot").textContent=DATA.spot;
 document.getElementById("when").textContent=`${DATA.time} · ${DATA.buoy_label||"buoy "+DATA.buoy}`;
 document.getElementById("size").textContent=`${DATA.breakers[0]}–${DATA.breakers[1]} ft`;
+if(DATA.calibration)document.querySelector(".size .sub").textContent=`surf height · tuned to ${DATA.calibration.n} session${DATA.calibration.n>1?"s":""}`;
 document.getElementById("summary").innerHTML=summary();
 legend();render();
 addEventListener("resize",redraw);
@@ -754,6 +755,7 @@ const peelWord=a=>a>=60?"slow and forgiving":a>=45?"a steady, makeable wall":a>=
 function peelSummary(){
   const L=DATA.lineup;if(!L)return null;
   const S=L.swells.map(x=>({x,s:DATA.swells[x.i]})),m=S.reduce((a,b)=>b.s.site_ft>a.s.site_ft?b:a);
+  if(L.break_type==="jetty")return`<b style="color:${m.s.color}">${name(m.s)}</b>: a jetty break: the peak forms where sand builds up against the jetty and where waves bounce off it, and neither is in the model (it has no sand, and its waves don't reflect). The view shows where the swell's energy lands.`;
   if(L.break_type==="beach")return`<b style="color:${m.s.color}">${name(m.s)}</b>: this is a beach break, so where it peaks and which way it peels depends on the sandbars, which shift week to week and aren't in any public data. The view shows where the swell's energy lands along the beach: brighter, bigger whitewater means more of it.`;
   const segs=m.x.peel.filter(p=>p.len>=40),[px,py]=L.spot;
   const side=p=>p.right?"right":"left",dist=p=>Math.min(...p.x.map((x,k)=>Math.hypot(x-px,p.y[k]-py)));
@@ -843,7 +845,7 @@ function realLineup(){
     const pill=(txt,x,y,bg,fg)=>{const w=ctx.measureText(txt).width+14*s;x=Math.min(Math.max(x,w/2+4*s),W-w/2-4*s);ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(x-w/2,y-10*s,w,20*s,10*s);ctx.fill();ctx.fillStyle=fg;ctx.textAlign="center";ctx.fillText(txt,x,y)};
     // break lines with peel direction, for the biggest swell that's on
     const m=act.length?act.reduce((a,b)=>b.s.site_ft>a.s.site_ft?b:a):null;
-    if(m&&L.break_type!=="beach")for(const pl of m.x.peel){if(pl.len<40)continue;
+    if(m&&L.break_type!=="beach"&&L.break_type!=="jetty")for(const pl of m.x.peel){if(pl.len<40)continue;
       const P=pl.x.map((x,k)=>toScreen(x,pl.y[k],W,H));
       ctx.setLineDash([6*s,5*s]);ctx.strokeStyle="rgba(255,255,255,.9)";ctx.lineWidth=2*s;ctx.beginPath();P.forEach((q,k)=>k?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));ctx.stroke();ctx.setLineDash([]);
       const k=Math.floor(P.length/2);
@@ -877,7 +879,7 @@ function realLineup(){
   sb.onclick=()=>{speed=speed===1?3:1;sb.textContent=speed===1?"Real speed":"3× speed"};
   new IntersectionObserver(es=>{visible=es[0].isIntersecting}).observe(cv);
   addEventListener("resize",size);size();requestAnimationFrame(loop);
-  document.getElementById("lineup-sub").textContent=`The break from above, on ${DATA.spot}'s real coastline and seafloor, with the open ocean at the top. White is breaking water${L.break_type==="beach"?"":"; the dashed line is where the bigger waves of the main swell break, with arrows showing which way they peel"}.`;
+  document.getElementById("lineup-sub").textContent=`The break from above, on ${DATA.spot}'s real coastline and seafloor, with the open ocean at the top. White is breaking water${L.break_type==="beach"||L.break_type==="jetty"?"":"; the dashed line is where the bigger waves of the main swell break, with arrows showing which way they peel"}.`;
   document.getElementById("lineup-note").textContent=`From the model: linear wave rays over NOAA depth data, which is smooth inside about 10 m depth, so individual reef sections and sandbars aren't in it. Peel angle is between the break line and the wave crest: around 45–60° is a makeable wall, under 30° is too fast. Turn swells off to see what each one adds.`;
   return true;
 }

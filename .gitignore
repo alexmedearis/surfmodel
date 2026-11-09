@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 .DS_Store
 data/forecast/
+data/sessions/          # where and when you surf: private

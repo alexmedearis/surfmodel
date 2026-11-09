@@ -1,7 +1,7 @@
 # Surf model (prototype)
 
 Physics-based "spot filters" for California surf breaks, driven by live deep-water buoys
-(CDIP, or NOAA NDBC) for right now and by NOAA's WaveWatch III swell forecast for the next 7 days. Regions so far: SF Bay Area (checked against a nearshore buoy) and
+(CDIP, or NOAA NDBC) for right now and by NOAA's WaveWatch III swell forecast for the next 7 days. Regions so far: SF Bay Area (Linda Mar, Ocean Beach, Mavericks, Stinson, Princeton Jetty) (checked against a nearshore buoy) and
 Santa Cruz / Monterey Bay (checked against a buoy inside the bay). Set up to grow region by region.
 
 **Pipeline:** NOAA seafloor depths (~90 m regional grid + ~10 m nearshore grid per spot)
@@ -22,6 +22,8 @@ python validate.py bayarea 30         # check against nearshore buoys -> out/che
 python check_mop.py                   # check each spot's 10 m grid against CDIP's MOP nearshore model -> out/check_mop.png
 python forecast_log.py                # record every forecast run still online (GitHub Actions does this every 6 h)
 python score_forecast.py              # score the logged forecasts against the buoys, by days ahead
+python log_session.py pleasure-point 7:30am head --peel right --quality 4   # log a session (sets, on you)
+python calibrate.py                   # fit per-spot surf-height corrections from sessions -> data/calibration.json
 python plot_filters.py                # spot filter heatmaps -> out/spot_filters_<region>.png
 ```
 
@@ -54,6 +56,13 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
   direction: beach breaks depend on sandbars, which no public data has.
 - `validate.py`: model vs nearshore buoys
 - `check_mop.py`: model vs CDIP's MOP nearshore model at each spot (the `mop` column in spots.csv)
+- `sessions.py`, `log_session.py`, `calibrate.py`: surf session reports ("how was it?") and calibration.
+  `sessions.py` is the shared core (schema, size scale, storage, the model's prediction for a spot and time),
+  meant to be reused by the web/iPhone app backend; `log_session.py` is the command line for now. Each report
+  stores the model's prediction when it was logged, so calibration doesn't need old buoy data.
+  Sessions live in `data/sessions/sessions.csv`, which is **not committed** (where and when you surf).
+  `calibrate.py` fits each spot's reported/predicted set height, shrunk toward 1 with few sessions (none
+  below 3), and checks peel direction; `predict.surf_ft()` applies it everywhere and pages say "tuned to N sessions".
 - `forecast_log.py`, `score_forecast.py`, `.github/workflows/forecast-log.yml`: forecast record and scoring.
   NOAA keeps only ~2 days of runs, so a GitHub Action logs each run (and recent buoy readings) to
   `data/forecast_log/` every 6 hours and commits it. Each run is scaled to the buoy reading from when it came out.
@@ -88,6 +97,7 @@ spot, 30 days to 2026-11-09:
 | Ocean Beach | SF029 | 1.08 | 1.2 ft | 0.95 |
 | Mavericks | SM305 | 1.05 | 0.9 ft | 0.94 |
 | Stinson | MA123 | 1.10 | 0.5 ft | 0.93 |
+| Princeton Jetty | SM297 (1.1 km away: MOP has no point at the jetty) | 1.05 | 0.5 ft | 0.93 |
 | Steamer Lane | SC149 | 0.91 | 0.5 ft | 0.94 |
 | Pleasure Point | SC117 | 0.95 | 0.4 ft | 0.93 |
 
