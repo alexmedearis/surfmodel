@@ -152,7 +152,7 @@ details.foot p{margin:8px 0 0}
   <div class="lineup-wrap"><canvas id="lineup" aria-label="Animated view of the swells arriving at the break"></canvas></div>
   <div class="lineup-ctl">
     <div id="lineup-swells" class="togs"></div>
-    <div class="btns"><button id="lineup-play" class="btn">Pause</button><button id="lineup-speed" class="btn">Real speed</button></div>
+    <div class="btns"><button id="lineup-orient" class="btn" hidden>Ocean at top</button><button id="lineup-play" class="btn">Pause</button><button id="lineup-speed" class="btn">Real speed</button></div>
   </div>
   <p class="note" id="lineup-note">Simplified: a straight beach on a smooth, sloping bottom. The angle and mix of swells come from the model;
     where exactly it peaks depends on sandbars and reef, which it doesn't know. Turn swells off to see what each one adds.</p>
@@ -772,35 +772,41 @@ function realLineup(){
   const sn=DATA.shore_normal??180,r=Math.PI/180;
   const S=L.swells.map(x=>({x,s:DATA.swells[x.i],ph:b64(x.ph),K:b64(x.K),bth:b64(x.bth),tg:b64(x.tg,2),w:2*Math.PI/x.T}));
   const on=new Set(S.map(o=>o.x.i));
-  // view: 4:3, about 70% of the box, rotated so "out to sea" (shore normal) is up; model point a bit above centre
+  // view: 4:3, about 70% of the box. North up by default (like the map above), or rotated so
+  // the open ocean (the shore normal) is at the top. The shore straight in from the spot sits
+  // ~80% of the way toward the beach side either way.
   const Wm=B*0.7,Hm=Wm*0.75,NX=280,NY=210;
-  const ux=[Math.sin((sn+90)*r),Math.cos((sn+90)*r)],uy=[Math.sin(sn*r),Math.cos(sn*r)];   // screen right / up in (east, north)
-  // centre so the shore straight in from the spot sits ~80% of the way down the view
-  let dL=0;for(;dL<B/2-20;dL+=6){const x=B/2-uy[0]*dL,y=B/2-uy[1]*dL,gi=Math.floor(x/cell),gj=Math.floor(y/cell);
+  const sea=[Math.sin(sn*r),Math.cos(sn*r)];
+  let dL=0;for(;dL<B/2-20;dL+=6){const x=B/2-sea[0]*dL,y=B/2-sea[1]*dL,gi=Math.floor(x/cell),gj=Math.floor(y/cell);
     if(gi<0||gj<0||gi>=nc||gj>=nc||dep[gj*nc+gi]<3)break}
   const off=Math.min(Math.max(dL-0.3*Hm,0.05*Hm),(B-Hm)/2*0.9);
-  const c0=[B/2-uy[0]*off,B/2-uy[1]*off];
-  // each screen pixel -> its 4 surrounding grid cells and bilinear weights
-  const idx=new Int32Array(NX*NY),nb=new Int32Array(NX*NY*4),wb=new Float32Array(NX*NY*4);
-  for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
-    const p=j*NX+i,sx=(i/(NX-1)-0.5)*Wm,sy=(0.5-j/(NY-1))*Hm,ex=c0[0]+sx*ux[0]+sy*uy[0],ey=c0[1]+sx*ux[1]+sy*uy[1];
-    const fx=ex/cell-0.5,fy=ey/cell-0.5,gi=Math.floor(fx),gj=Math.floor(fy),ax=fx-gi,ay=fy-gj;
-    if(gi<0||gj<0||gi>=nc-1||gj>=nc-1){idx[p]=-1;continue}
-    idx[p]=Math.round(fy)*nc+Math.round(fx);
-    nb[4*p]=gj*nc+gi;nb[4*p+1]=gj*nc+gi+1;nb[4*p+2]=(gj+1)*nc+gi;nb[4*p+3]=(gj+1)*nc+gi+1;
-    wb[4*p]=(1-ax)*(1-ay);wb[4*p+1]=ax*(1-ay);wb[4*p+2]=(1-ax)*ay;wb[4*p+3]=ax*ay;
-  }
+  const c0=[B/2-sea[0]*off,B/2-sea[1]*off];
+  let rot=0,ux,uy,idx,nb,wb,hpx;
   const bil=(arr,p,f)=>{let v=0;for(let q=0;q<4;q++)v+=wb[4*p+q]*f(arr[nb[4*p+q]]);return v};
   const toScreen=(x,y,W,H)=>{const dx=x-c0[0],dy=y-c0[1];return[(dx*ux[0]+dy*ux[1])/Wm*W+W/2,(0.5-(dx*uy[0]+dy*uy[1])/Hm)*H]};
-  // per-swell lookups at screen pixels
-  for(const o of S){
-    o.cos=new Float32Array(NX*NY);o.sin=new Float32Array(NX*NY);o.amp=new Float32Array(NX*NY);o.br=new Float32Array(NX*NY);o.t=new Float32Array(NX*NY);
-    for(let p=0;p<NX*NY;p++){const g=idx[p];if(g<0)continue;
-      const c=bil(o.ph,p,v=>Math.cos(v/256*2*Math.PI)),sn_=bil(o.ph,p,v=>Math.sin(v/256*2*Math.PI)),m=Math.hypot(c,sn_)||1;
-      o.cos[p]=c/m;o.sin[p]=sn_/m;o.amp[p]=bil(o.K,p,v=>v)/100*o.x.H0/2;
-      o.br[p]=o.bth[g]===255?1e9:o.bth[g]/20;o.t[p]=bil(o.tg,p,v=>v)/10}
+  function setup(up){                                          // up: compass bearing at the top of the view
+    rot=up;ux=[Math.sin((up+90)*r),Math.cos((up+90)*r)];uy=[Math.sin(up*r),Math.cos(up*r)];   // screen right / up in (east, north)
+    // each screen pixel -> its 4 surrounding grid cells and bilinear weights
+    idx=new Int32Array(NX*NY);nb=new Int32Array(NX*NY*4);wb=new Float32Array(NX*NY*4);
+    for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){
+      const p=j*NX+i,sx=(i/(NX-1)-0.5)*Wm,sy=(0.5-j/(NY-1))*Hm,ex=c0[0]+sx*ux[0]+sy*uy[0],ey=c0[1]+sx*ux[1]+sy*uy[1];
+      const fx=ex/cell-0.5,fy=ey/cell-0.5,gi=Math.floor(fx),gj=Math.floor(fy),ax=fx-gi,ay=fy-gj;
+      if(gi<0||gj<0||gi>=nc-1||gj>=nc-1){idx[p]=-1;continue}
+      idx[p]=Math.round(fy)*nc+Math.round(fx);
+      nb[4*p]=gj*nc+gi;nb[4*p+1]=gj*nc+gi+1;nb[4*p+2]=(gj+1)*nc+gi;nb[4*p+3]=(gj+1)*nc+gi+1;
+      wb[4*p]=(1-ax)*(1-ay);wb[4*p+1]=ax*(1-ay);wb[4*p+2]=(1-ax)*ay;wb[4*p+3]=ax*ay;
+    }
+    // per-swell lookups at screen pixels
+    for(const o of S){
+      o.cos=new Float32Array(NX*NY);o.sin=new Float32Array(NX*NY);o.amp=new Float32Array(NX*NY);o.br=new Float32Array(NX*NY);o.t=new Float32Array(NX*NY);
+      for(let p=0;p<NX*NY;p++){const g=idx[p];if(g<0)continue;
+        const c=bil(o.ph,p,v=>Math.cos(v/256*2*Math.PI)),sn_=bil(o.ph,p,v=>Math.sin(v/256*2*Math.PI)),m=Math.hypot(c,sn_)||1;
+        o.cos[p]=c/m;o.sin[p]=sn_/m;o.amp[p]=bil(o.K,p,v=>v)/100*o.x.H0/2;
+        o.br[p]=o.bth[g]===255?1e9:o.bth[g]/20;o.t[p]=bil(o.tg,p,v=>v)/10}
+    }
+    hpx=new Float32Array(NX*NY);for(let p=0;p<NX*NY;p++)hpx[p]=idx[p]<0?-1:bil(dep,p,v=>v)/8;
   }
-  const hpx=new Float32Array(NX*NY);for(let p=0;p<NX*NY;p++)hpx[p]=idx[p]<0?-1:bil(dep,p,v=>v)/8;
+  setup(0);
   // sets: each swell's envelope, a slow beat of a few nearby periods, travelling at group speed
   let rng=11;const rnd=()=>((rng=(rng*16807)%2147483647)/2147483647);
   for(const o of S){const n=4,bw=o.s.tp>=13?0.035:0.08;o.env=[];for(let k=0;k<n;k++)o.env.push({d:o.w*bw*(rnd()-0.5)*2,p:rnd()*6.28});}
@@ -857,12 +863,16 @@ function realLineup(){
     {const [qx,qy]=toScreen(L.spot[0],L.spot[1],W,H);ctx.fillStyle="#fff";ctx.strokeStyle="#1f1e1c";ctx.lineWidth=2*s;ctx.beginPath();ctx.arc(qx,qy,5*s,0,7);ctx.fill();ctx.stroke();
       ctx.font=`600 ${12*s}px -apple-system,BlinkMacSystemFont,sans-serif`;ctx.lineWidth=3*s;ctx.strokeStyle="rgba(0,0,0,.55)";ctx.textAlign="left";ctx.strokeText(DATA.spot,qx+9*s,qy);ctx.fillStyle="#fff";ctx.fillText(DATA.spot,qx+9*s,qy)}
     // where each swell comes from
-    act.forEach((o,k)=>{const am=arrivals(o.s);if(am===null)return;const rel=(am+180-sn)*r,dx=Math.sin(rel),dy=-Math.cos(rel);
+    act.forEach((o,k)=>{const am=arrivals(o.s);if(am===null)return;const rel=(am+180-rot)*r,dx=Math.sin(rel),dy=-Math.cos(rel);
       const cx=W*(0.2+0.6*(act.length>1?k/(act.length-1):0.5)),cy=H*0.15,Lr=26*s;
       arrow(cx-dx*Lr,cy-dy*Lr,cx+dx*Lr*0.7,cy+dy*Lr*0.7,o.s.color,4*s,11*s);pill(o.s.short,cx-dx*Lr*1.25,cy-dy*Lr*1.25-14*s,o.s.color,"#fff")});
-    // north arrow and scale
-    const nx=W-26*s,ny=26*s;ctx.fillStyle="rgba(255,255,255,.88)";ctx.beginPath();ctx.arc(nx,ny,15*s,0,7);ctx.fill();
-    ctx.save();ctx.translate(nx,ny);ctx.rotate(-sn*r);ctx.fillStyle="#1f1e1c";ctx.beginPath();ctx.moveTo(0,-10*s);ctx.lineTo(6*s,6*s);ctx.lineTo(0,2*s);ctx.lineTo(-6*s,6*s);ctx.closePath();ctx.fill();ctx.restore();
+    // compass: needle with N, rotated to true north
+    const nx=W-30*s,ny=30*s;ctx.fillStyle="rgba(255,255,255,.92)";ctx.beginPath();ctx.arc(nx,ny,20*s,0,7);ctx.fill();
+    ctx.save();ctx.translate(nx,ny);ctx.rotate(-rot*r);
+    ctx.fillStyle="#d4462f";ctx.beginPath();ctx.moveTo(0,-11*s);ctx.lineTo(4.5*s,0);ctx.lineTo(-4.5*s,0);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#9a988f";ctx.beginPath();ctx.moveTo(0,11*s);ctx.lineTo(4.5*s,0);ctx.lineTo(-4.5*s,0);ctx.closePath();ctx.fill();
+    ctx.translate(0,-15.5*s);ctx.rotate(rot*r);ctx.fillStyle="#1f1e1c";ctx.font=`700 ${9*s}px -apple-system,sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("N",0,0);
+    ctx.restore();
     const sc=100,px=sc/Wm*W,by=H-14*s;ctx.fillStyle="rgba(255,255,255,.88)";ctx.beginPath();ctx.roundRect(10*s,by-24*s,px+20*s,30*s,6*s);ctx.fill();
     ctx.strokeStyle="#1f1e1c";ctx.lineWidth=1.5*s;ctx.beginPath();ctx.moveTo(20*s,by-2*s);ctx.lineTo(20*s+px,by-2*s);ctx.stroke();
     ctx.fillStyle="#1f1e1c";ctx.font=`${11*s}px -apple-system,sans-serif`;ctx.textAlign="center";ctx.fillText(`${sc} m`,20*s+px/2,by-13*s);
@@ -877,9 +887,12 @@ function realLineup(){
   const setPB=()=>{pb.textContent=playing?"Pause":"Play";pb.setAttribute("aria-pressed",!playing)};
   pb.onclick=()=>{playing=!playing;setPB()};setPB();
   sb.onclick=()=>{speed=speed===1?3:1;sb.textContent=speed===1?"Real speed":"3× speed"};
+  const ob=document.getElementById("lineup-orient"),seaName=COMPASS[Math.round(sn/22.5)%16];
+  const caption=()=>document.getElementById("lineup-sub").textContent=`The break from above, on ${DATA.spot}'s real coastline and seafloor, with ${rot===0?`north at the top (the open ocean is to the ${seaName})`:`the open ocean (${seaName}) at the top`}. White is breaking water${L.break_type==="beach"||L.break_type==="jetty"?"":"; the dashed line is where the bigger waves of the main swell break, with arrows showing which way they peel"}.`;
+  ob.hidden=false;ob.onclick=()=>{setup(rot===0?sn:0);ob.textContent=rot===0?"Ocean at top":"North up";caption();frame()};
   new IntersectionObserver(es=>{visible=es[0].isIntersecting}).observe(cv);
   addEventListener("resize",size);size();requestAnimationFrame(loop);
-  document.getElementById("lineup-sub").textContent=`The break from above, on ${DATA.spot}'s real coastline and seafloor, with the open ocean at the top. White is breaking water${L.break_type==="beach"||L.break_type==="jetty"?"":"; the dashed line is where the bigger waves of the main swell break, with arrows showing which way they peel"}.`;
+  caption();
   document.getElementById("lineup-note").textContent=`From the model: linear wave rays over NOAA depth data, which is smooth inside about 10 m depth, so individual reef sections and sandbars aren't in it. Peel angle is between the break line and the wave crest: around 45–60° is a makeable wall, under 30° is too fast. Turn swells off to see what each one adds.`;
   return true;
 }
