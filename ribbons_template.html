@@ -103,7 +103,7 @@ details.foot p{margin:8px 0 0}
 <div class="card">
   <div class="top">
     <div><h1 id="spot"></h1><div class="sub" id="when"></div></div>
-    <div class="size"><div class="big" id="size"></div><div class="sub">est. breakers</div></div>
+    <div class="size"><div class="big" id="size"></div><div class="sub">surf height</div></div>
   </div>
   <p class="summary" id="summary"></p>
   <div class="bar-row">
@@ -119,6 +119,9 @@ details.foot p{margin:8px 0 0}
   <div class="rows" id="rows"></div>
   <details class="foot">
     <summary>How to read this</summary>
+    <p><b>Surf height</b> is the face height of the waves as they break: the low number is the typical bigger
+      waves, the high number the sets. Swell heights (offshore, and "here" for each swell) are the standard
+      average-height measure buoys use, so they're smaller than the faces you'd see breaking.</p>
     <p>Each ribbon is one swell, following the path it takes as it bends over the real seafloor (NOAA depth data).
       Its width is the swell's estimated height along the way, so you can see it shrink as it wraps in.
       The moving dots show the direction of travel.</p>
@@ -134,10 +137,10 @@ details.foot p{margin:8px 0 0}
 </div>
 <div class="card fc" id="fc" hidden>
   <h2>Next 7 days</h2>
-  <p class="sub" id="fc-sub">Estimated breakers at the spot, from NOAA's swell forecast run through this spot's model.</p>
+  <p class="sub" id="fc-sub">Surf height at the spot, from NOAA's swell forecast run through this spot's model.</p>
   <div class="days" id="fc-days"></div>
   <div class="chart" id="fc-chart"><svg id="fc-svg" role="img" aria-label="Chart of forecast wave height over the next 7 days"></svg><div class="tip" id="fc-tip"></div></div>
-  <div class="fkey"><span><svg width="22" height="10"><rect x="0" y="1" width="22" height="8" rx="2" fill="var(--deep)" opacity=".3"/><line x1="0" y1="5" x2="22" y2="5" stroke="var(--deep)" stroke-width="2"/></svg>Breakers here</span>
+  <div class="fkey"><span><svg width="22" height="10"><rect x="0" y="1" width="22" height="8" rx="2" fill="var(--deep)" opacity=".3"/><line x1="0" y1="5" x2="22" y2="5" stroke="var(--deep)" stroke-width="2"/></svg>Surf height here</span>
     <span><svg width="22" height="10"><line x1="0" y1="5" x2="22" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>Swell height offshore</span>
     <span><svg width="14" height="10"><rect width="14" height="10" rx="2" fill="var(--chip)"/></svg>Night</span></div>
   <p class="note" id="fc-note"></p>
@@ -591,7 +594,7 @@ function forecastCard(){
       const tt=t0+(x-pl)/(W-pl-pr)*(t1-t0);let k=0;for(let i=1;i<H.length;i++)if(Math.abs(H[i].t-tt)<Math.abs(H[k].t-tt))k=i;
       const h=H[k],px=X(h.t);cur.setAttribute("x1",px);cur.setAttribute("x2",px);cur.setAttribute("opacity",.35);
       dot.setAttribute("cx",px);dot.setAttribute("cy",Y((h.lo+h.hi)/2));dot.setAttribute("opacity",1);
-      tip.innerHTML=`<div class="tl">${dfmt(h.t,{weekday:"short",hour:"numeric"})}</div><b>${range(h.lo,h.hi)} ft</b> breakers
+      tip.innerHTML=`<div class="tl">${dfmt(h.t,{weekday:"short",hour:"numeric"})}</div><b>${range(h.lo,h.hi)} ft</b> surf
         <div class="tl" style="margin-top:4px">Swell offshore ${fmt(h.off)} ft</div>`+
         h.sw.map(s=>`<div>${s[0]}: ${fmt(s[2])} ft out → <b style="font-size:12px">${fmt(s[1])} ft</b> here</div>`).join("");
       tip.style.display="block";const tw=tip.offsetWidth;tip.style.left=Math.min(Math.max(px+12,0),W-tw)+"px";

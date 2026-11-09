@@ -19,6 +19,7 @@ python forecast.py santacruz          # NOAA WaveWatch III swell forecast at the
 python ribbons.py                     # interactive swell-ribbon map + 7-day forecast per spot -> out/ribbons_*.html
 python ribbons.py --at "2026-11-07 06:00" stinson   # same, for the buoy reading nearest a UTC time
 python validate.py bayarea 30         # check against nearshore buoys -> out/check_*.png
+python check_mop.py                   # check each spot's 10 m grid against CDIP's MOP nearshore model -> out/check_mop.png
 python forecast_log.py                # record every forecast run still online (GitHub Actions does this every 6 h)
 python score_forecast.py              # score the logged forecasts against the buoys, by days ahead
 python plot_filters.py                # spot filter heatmaps -> out/spot_filters_<region>.png
@@ -47,6 +48,7 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
 - `ribbons.py`, `ribbons_template.html`: consumer-style page showing each swell's real refracted path into a spot,
   on a zoomable map, with a fan per swell showing which of its directions reach the spot
 - `validate.py`: model vs nearshore buoys
+- `check_mop.py`: model vs CDIP's MOP nearshore model at each spot (the `mop` column in spots.csv)
 - `forecast_log.py`, `score_forecast.py`, `.github/workflows/forecast-log.yml`: forecast record and scoring.
   NOAA keeps only ~2 days of runs, so a GitHub Action logs each run (and recent buoy readings) to
   `data/forecast_log/` every 6 hours and commits it. Each run is scaled to the buoy reading from when it came out.
@@ -71,9 +73,32 @@ from 1.4 to 0.9 ft on days 2-3. At SF Bar it was already good (1.0-1.2 ft; WaveW
 point there: 2.2 ft), and the scaling made it slightly worse (1.2-1.4 ft), because there WaveWatch III's low
 bias had been cancelling a small high bias of ours. Needs a longer record: that's what the forecast log is for (`score_forecast.py`).
 
+Spot level, against CDIP's MOP model (hourly wave height every ~100 m along the coast at 10-15 m
+depth, computed independently with different methods and bathymetry), at the MOP point nearest each
+spot, 30 days to 2026-11-09:
+
+| Spot | MOP point | ours / MOP | RMSE | r |
+|---|---|---|---|---|
+| Linda Mar | SM376 | 0.94 | 0.7 ft | 0.91 |
+| Ocean Beach | SF029 | 1.08 | 1.2 ft | 0.95 |
+| Mavericks | SM305 | 1.05 | 0.9 ft | 0.94 |
+| Stinson | MA123 | 1.10 | 0.5 ft | 0.93 |
+| Steamer Lane | SC149 | 0.91 | 0.5 ft | 0.94 |
+| Pleasure Point | SC117 | 0.95 | 0.4 ft | 0.93 |
+
+Two independent models agreeing within ~10% is good evidence the 10 m spot grids are right, but
+MOP is a model, not a measurement. MOP's shore directions also match ours within 6° except Mavericks
+(221° vs 238°), where the coast bends sharply.
+
+**Surf height** (shown on the pages) is the face height of breaking waves: from the significant
+breaker height (Komar & Gaudiano 1975; average of the biggest third) up to 1.25x that for the sets
+(`SURF_RANGE` in predict.py). The wave height feeding it is checked (above); the breaking step isn't yet,
+and needs observations at the breaks.
+
 ## Known limitations
 - Ray theory ignores diffraction, so it under-predicts energy leaking into sheltered corners.
   The 10 m grids are smoothed to ~30 m because finer features don't bend swell-length waves.
-- No wind, tide, currents or sandbars. Breaker heights use a generic formula and are **uncalibrated**.
+- No wind, tide, currents or sandbars. Surf heights use a generic breaking formula that is **not yet calibrated**
+  against observed surf (the wave heights feeding it are; see check_mop.py).
 - The forecast is swell only (no wind or tide yet). WaveWatch III's 10° direction bins are coarser than a
   buoy's, and NOAA keeps only ~2 days of runs online, so scoring the forecast relies on our own log (`forecast_log.py`).

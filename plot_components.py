@@ -9,7 +9,7 @@ import config
 from common import Bathy
 from raytrace import Tracer
 from buoy import latest
-from predict import load_tables, predict, swells, M2FT
+from predict import load_tables, predict, swells, M2FT, surf_ft
 from partition import label
 
 COLORS = ["#d9480f", "#1c7ed6", "#2f9e44", "#ae3ec9", "#f08c00"]
@@ -85,7 +85,7 @@ def plot_spot(tab, spec, parts, coarse):
     ax.barh(yy + 0.18, [c["hs_off"] * M2FT for _, c in show], 0.36, color="0.75", label="offshore")
     ax.barh(yy - 0.18, [c["hs_site"] * M2FT for _, c in show], 0.36, color=COLORS[:len(show)], label=f"at spot ({tab['depth']:.0f} m deep)")
     ax.set_yticks(yy); ax.set_yticklabels(labs, fontsize=8); ax.set_xlabel("wave height (ft)")
-    ax.legend(fontsize=8); ax.set_title(f"Est. breakers ~{r['hb']*M2FT*0.8:.0f}-{r['hb']*M2FT*1.2:.0f} ft", fontsize=10)
+    ax.legend(fontsize=8); ax.set_title(f"Surf ~{surf_ft(r['hb'])[0]:.0f}-{surf_ft(r['hb'])[1]:.0f} ft", fontsize=10)
     fig.suptitle(f"{tab['name']}: which of today's swells make it in  "
                  f"(buoy {spec['stn']} @ {spec['time']:%b %d %H:%M} UTC; 10 m seafloor grid, ▲ = model point)", fontsize=11)
     fig.tight_layout()

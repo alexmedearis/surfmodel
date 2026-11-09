@@ -37,8 +37,19 @@ def offshore(spec, dirs):
         return on_dirs(spec, dirs)
     return spec["E"][:, None] * mem(spec["a1"], spec["b1"], spec["a2"], spec["b2"], dirs)
 
+# Surf height, as shown everywhere: the face height of the waves breaking, from the typical bigger
+# waves (the significant breaker height, average of the biggest third) up to the sets (about the
+# biggest 10%, ~1.25x that for a Rayleigh height distribution). Not yet calibrated against observations.
+SURF_RANGE = (1.0, 1.25)
+
+def surf_ft(hb):
+    """(low, high) surf height in feet from the significant breaker height in metres."""
+    return tuple(hb * M2FT * k for k in SURF_RANGE)
+
 def breaking_height(hs_site, T, h_site):
-    """Rough breaker height: back out an equivalent deep-water height, then Komar & Gaudiano (1975)."""
+    """Significant breaker height (m): back out an equivalent deep-water height, then
+    Komar & Gaudiano (1975). Checked indirectly only: hs_site agrees with CDIP's MOP model
+    to ~10% (check_mop.py), but nothing yet checks the breaking step itself."""
     c, cg = c_cg(T, h_site); ks = np.sqrt((9.81 * T / 4 / np.pi) / cg)
     h0 = hs_site / ks
     return 0.39 * 9.81 ** 0.2 * (T * h0 ** 2) ** 0.4
@@ -76,7 +87,7 @@ def report(spec, tabs):
     res = []
     for tab in tabs:
         r = predict(spec, tab, parts); res.append(r)
-        print(f"\n{r['name']}  (model point {r['depth']:.0f} m deep):  est. breakers ~{r['hb']*M2FT*0.8:.0f}-{r['hb']*M2FT*1.2:.0f} ft"
+        print(f"\n{r['name']}  (model point {r['depth']:.0f} m deep):  surf ~{surf_ft(r['hb'])[0]:.0f}-{surf_ft(r['hb'])[1]:.0f} ft"
               f"  (Hs {r['hs']*M2FT:.1f} ft, Tp {r['tp']:.0f}s)")
         for c in r["comps"]:
             pct = c["hs_site"] / max(c["hs_off"], 1e-9)
@@ -104,7 +115,7 @@ if __name__ == "__main__":
     spec = latest(stn); spec["stn"] = stn
     report(spec, tabs)
     if "--what-if" in sys.argv:
-        print("\nWhat-if: same 2 m (6.6 ft) deep-water swell from different directions -> est. breakers (ft)")
+        print("\nWhat-if: same 2 m (6.6 ft) deep-water swell from different directions -> surf height, typical bigger waves (ft)")
         scen = [(14, 300, "14s NW 300°"), (14, 270, "14s W 270°"), (16, 220, "16s SW 220°"), (17, 195, "17s S 195°")]
         print(f"{'':14s}" + "".join(f"{s[2]:>14s}" for s in scen))
         for tab in tabs:

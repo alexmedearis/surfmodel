@@ -1,9 +1,9 @@
-slug,name,region,lat,lon,depth,kind,station
-linda-mar,Linda Mar,bayarea,37.5960,-122.5030,10,spot,
-ocean-beach,Ocean Beach,bayarea,37.7600,-122.5120,10,spot,
-mavericks,Mavericks,bayarea,37.4935,-122.5000,10,spot,
-stinson,Stinson,bayarea,37.8990,-122.6430,10,spot,
-sf-bar-buoy,SF Bar buoy (check),bayarea,37.7881,-122.6325,,buoy,142
-steamer-lane,Steamer Lane,santacruz,36.9513,-122.0262,10,spot,
-pleasure-point,Pleasure Point,santacruz,36.9547,-121.9707,10,spot,
-monterey-canyon-buoy,Monterey Canyon buoy (check),santacruz,36.7592,-121.9503,,buoy,156
+slug,name,region,lat,lon,depth,kind,station,mop
+linda-mar,Linda Mar,bayarea,37.5960,-122.5030,10,spot,,SM376
+ocean-beach,Ocean Beach,bayarea,37.7600,-122.5120,10,spot,,SF029
+mavericks,Mavericks,bayarea,37.4935,-122.5000,10,spot,,SM305
+stinson,Stinson,bayarea,37.8990,-122.6430,10,spot,,MA123
+sf-bar-buoy,SF Bar buoy (check),bayarea,37.7881,-122.6325,,buoy,142,
+steamer-lane,Steamer Lane,santacruz,36.9513,-122.0262,10,spot,,SC149
+pleasure-point,Pleasure Point,santacruz,36.9547,-121.9707,10,spot,,SC117
+monterey-canyon-buoy,Monterey Canyon buoy (check),santacruz,36.7592,-121.9503,,buoy,156,
