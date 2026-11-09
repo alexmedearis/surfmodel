@@ -862,10 +862,22 @@ function realLineup(){
     // the spot
     {const [qx,qy]=toScreen(L.spot[0],L.spot[1],W,H);ctx.fillStyle="#fff";ctx.strokeStyle="#1f1e1c";ctx.lineWidth=2*s;ctx.beginPath();ctx.arc(qx,qy,5*s,0,7);ctx.fill();ctx.stroke();
       ctx.font=`600 ${12*s}px -apple-system,BlinkMacSystemFont,sans-serif`;ctx.lineWidth=3*s;ctx.strokeStyle="rgba(0,0,0,.55)";ctx.textAlign="left";ctx.strokeText(DATA.spot,qx+9*s,qy);ctx.fillStyle="#fff";ctx.fillText(DATA.spot,qx+9*s,qy)}
-    // where each swell comes from
-    act.forEach((o,k)=>{const am=arrivals(o.s);if(am===null)return;const rel=(am+180-rot)*r,dx=Math.sin(rel),dy=-Math.cos(rel);
-      const cx=W*(0.2+0.6*(act.length>1?k/(act.length-1):0.5)),cy=H*0.15,Lr=26*s;
-      arrow(cx-dx*Lr,cy-dy*Lr,cx+dx*Lr*0.7,cy+dy*Lr*0.7,o.s.color,4*s,11*s);pill(o.s.short,cx-dx*Lr*1.25,cy-dy*Lr*1.25-14*s,o.s.color,"#fff")});
+    // each swell: an arrow in the water on the side it arrives from, pointing at the spot.
+    // The label gives its direction out at sea (e.g. 14s WNW) and where it arrives from after bending.
+    {const [qx,qy]=toScreen(L.spot[0],L.spot[1],W,H);
+     const items=act.map(o=>({o,am:arrivals(o.s)})).filter(a=>a.am!==null);
+     items.forEach(a=>{
+       const rel=(a.am-rot)*r;let sx=Math.sin(rel),sy=-Math.cos(rel);        // screen direction toward where it comes from
+       // swells arriving from about the same direction: fan them out so they don't overlap
+       const same=items.filter(b=>Math.abs(((b.am-a.am+540)%360)-180)<25),fan=(same.indexOf(a)-(same.length-1)/2)*0.4;
+       [sx,sy]=[sx*Math.cos(fan)-sy*Math.sin(fan),sx*Math.sin(fan)+sy*Math.cos(fan)];
+       const L0=24*s;let L1=Math.min(W,H)*0.36;
+       const fits=t=>{const x=qx+sx*t,y=qy+sy*t;return x>50*s&&x<W-50*s&&y>26*s&&y<H-26*s};
+       while(L1>L0+30*s&&!fits(L1+16*s))L1-=4*s;
+       arrow(qx+sx*L1,qy+sy*L1,qx+sx*L0,qy+sy*L0,a.o.s.color,4*s,11*s);
+       const lx=qx+sx*(L1+16*s),ly=Math.min(Math.max(qy+sy*(L1+16*s),14*s),H-14*s);
+       pill(`${a.o.s.short} · from ${COMPASS[Math.round(a.am/22.5)%16]}`,lx,ly,a.o.s.color,"#fff");
+     })}
     // compass: needle with N, rotated to true north
     const nx=W-30*s,ny=30*s;ctx.fillStyle="rgba(255,255,255,.92)";ctx.beginPath();ctx.arc(nx,ny,20*s,0,7);ctx.fill();
     ctx.save();ctx.translate(nx,ny);ctx.rotate(-rot*r);
