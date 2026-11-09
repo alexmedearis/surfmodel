@@ -28,7 +28,7 @@ import datetime as dt
 from buoy import latest, nearest
 from predict import load_tables, predict, swells, W_at, M2FT, surf_ft
 from partition import label, compass
-import forecast
+import forecast, lineup as LU, base64
 
 VIEW_SEAWARD, VIEW_HALF = 5500, (9500, 10000)    # coast map: centred this far out to sea, ~19 x 20 km
 COLORS = ["#1D9E75", "#D85A30", "#7F77DD", "#BA7517", "#D4537E"]
@@ -299,6 +299,48 @@ def forecast_series(tab, fc):
     return dict(run=int(fc["run"].timestamp()), point=fc["point"], gain=round(fc["gain"], 2), hours=hours,
                 lat=round(tab["lat"], 3), lon=round(tab["lon"], 3))
 
+def _b64(a, dtype):
+    return base64.b64encode(np.ascontiguousarray(a, dtype=dtype).tobytes()).decode()
+
+def lineup_data(tab, coarse, fine, swells_out):
+    """Real-geometry lineup for the swells reaching the spot (lineup.py), packed for the page."""
+    live = [s for s in swells_out if not s["blocked"] and s["strands"] and s["site_ft"] >= 0.5][:3]
+    if not live:
+        return None
+    out, h = [], None
+    for s in live:
+        # centre the spread on the directions that actually get in
+        w = np.array([t["share"] for t in s["strands"]]); a = np.radians([t["frm"] for t in s["strands"]])
+        frm = float(np.degrees(np.arctan2((w * np.sin(a)).sum(), (w * np.cos(a)).sum())) % 360)
+        F = LU.wavefield(coarse, fine, tab["lat"], tab["lon"], max(s["tp"], 5), frm)
+        if F is None:
+            continue
+        nc = F["nc"]; c = nc // 2
+        # match the height at the model point to the transfer table's (which has the full spectrum)
+        Kc = np.nanmean(F["K"][c - 5:c + 6, c - 5:c + 6])
+        f = float(np.clip((s["site_ft"] / max(s["off_ft"], 0.1)) / max(Kc, 1e-3), 0.6, 1.6)) if Kc > 0 else 1.0
+        K, bth = F["K"] * f, F["bth"] / f
+        H0 = s["off_ft"] / M2FT
+        pl = LU.peel(dict(F, bth=bth), H0)
+        tg = F["tg"]; tg0 = np.nanmin(tg) if np.isfinite(tg).any() else 0
+        out.append(dict(i=swells_out.index(s), T=round(float(F["T"]), 2), H0=round(H0, 2), frm=round(frm),
+                        ph=_b64(np.round((F["phase"] % (2 * np.pi)) / (2 * np.pi) * 256) % 256, np.uint8),
+                        K=_b64(np.clip(np.nan_to_num(K) * 100, 0, 255).round(), np.uint8),
+                        bth=_b64(np.where(np.isfinite(bth), np.clip(bth * 20, 0, 254), 255).round(), np.uint8),
+                        tg=_b64(np.clip(np.nan_to_num(tg - tg0, nan=0) * 10, 0, 65535).round(), "<u2"),
+                        peel=[dict(x=np.round(g["x"][::2], 1).tolist(), y=np.round(g["y"][::2], 1).tolist(),
+                                   angle=round(float(np.median(g["angle"])), 0), right=g["right"],
+                                   dir=[round(float(np.mean(g["vx"])), 3), round(float(np.mean(g["vy"])), 3)],
+                                   len=round(float(np.hypot(np.diff(g["x"]), np.diff(g["y"])).sum())))
+                              for g in pl]))
+        h = F["h"]
+    if not out:
+        return None
+    spot = next(r for r in config.load_spots() if r["slug"] == tab["slug"])
+    sx, sy = fine.to_xy(spot["lat"], spot["lon"])
+    return dict(nc=nc, cell=LU.CELL_M, depth=_b64(np.clip(h * 8, 0, 255).round(), np.uint8), swells=out,
+                spot=[round(float(sx) - F["x0"], 1), round(float(sy) - F["y0"], 1)], break_type=spot.get("break") or "")
+
 def build(tab, spec, parts, coarse, fc=None):
     fine = Bathy.fine(tab["slug"])
     frame = Frame(tab["lat"], tab["lon"])
@@ -348,6 +390,7 @@ def build(tab, spec, parts, coarse, fc=None):
         swells_out.append(item)
         print(f"  {item['label']:34s} {h_off:5.1f} -> {h_site:4.1f} ft, "
               f"{'blocked' if item['blocked'] else str(len(item['strands'])) + ' strand(s)'}", flush=True)
+    lu = lineup_data(tab, coarse, fine, swells_out) if "--no-lineup" not in sys.argv else None
     cpoly, cband, cdepth = land_polygons(coarse, frame, COAST_VIEW, 60)
     fpoly, fband, fdepth = land_polygons(fine, frame, None, 10)
     main = max(swells_out, key=lambda s: s["site_ft"], default=None)
@@ -360,7 +403,7 @@ def build(tab, spec, parts, coarse, fc=None):
                 views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),
                            cove=dict(box=cove_box, land=fpoly, bands=fband, depth=fdepth,
                                      extent=[round(float(fx0)), round(float(fx1)), round(float(fy0)), round(float(fy1))])),
-                swells=swells_out, forecast=forecast_series(tab, fc) if fc else None)
+                swells=swells_out, forecast=forecast_series(tab, fc) if fc else None, lineup=lu)
 
 if __name__ == "__main__":
     args = sys.argv[1:]

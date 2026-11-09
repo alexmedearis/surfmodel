@@ -47,6 +47,11 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
 - `predict.py`: nowcast at each spot, per swell (takes a buoy reading or a forecast hour)
 - `ribbons.py`, `ribbons_template.html`: consumer-style page showing each swell's real refracted path into a spot,
   on a zoomable map, with a fan per swell showing which of its directions reach the spot
+- `lineup.py`: real-geometry lineup for the "In the water" view. Forward rays from deep water over the spot's
+  ~10 m grid (five directions across the swell's spread) give crest positions, heights, set arrival times and
+  where each size of wave breaks; the break line's angle to the crest is the peel angle (Walker 1974, Hutt et
+  al. 2001). The `break` column in spots.csv (point / reef / beach) decides whether the page claims a peel
+  direction: beach breaks depend on sandbars, which no public data has.
 - `validate.py`: model vs nearshore buoys
 - `check_mop.py`: model vs CDIP's MOP nearshore model at each spot (the `mop` column in spots.csv)
 - `forecast_log.py`, `score_forecast.py`, `.github/workflows/forecast-log.yml`: forecast record and scoring.
@@ -97,6 +102,10 @@ and needs observations at the breaks.
 
 ## Known limitations
 - Ray theory ignores diffraction, so it under-predicts energy leaking into sheltered corners.
+- NOAA's depth data is survey-grade only deeper than ~10 m; inside that (where waves break) it's smooth fill,
+  even in the 3 m CUDEM tiles. So the lineup view gets the shape of a point or reef but not individual sections.
+  Steamer Lane and Pleasure Point come out as rights, as they are. Mavericks doesn't: the reef that makes its
+  famous right isn't resolved, and its spots.csv marker sits on Pillar Point rather than on the peak.
   The 10 m grids are smoothed to ~30 m because finer features don't bend swell-length waves.
 - No wind, tide, currents or sandbars. Surf heights use a generic breaking formula that is **not yet calibrated**
   against observed surf (the wave heights feeding it are; see check_mop.py).
