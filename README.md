@@ -107,7 +107,11 @@ MOP is a model, not a measurement. MOP's shore directions also match ours within
 
 **Surf height** (shown on the pages) is the face height of breaking waves: from the significant
 breaker height (Komar & Gaudiano 1975; average of the biggest third) up to 1.25x that for the sets
-(`SURF_RANGE` in predict.py). The wave height feeding it is checked (above); the breaking step isn't yet,
+(`SURF_RANGE` in predict.py). It's computed from a second table traced in the breaking zone at the
+marked spot (~4 m deep, `W_break`; `build_tables.py --break-only`), not the ~10 m model point: swell
+keeps bending over the last few hundred metres, a lot in sheltered corners. At Princeton Jetty on
+2026-11-09 the wave height at 4.5 m was 4.6 ft vs 6.9 ft at the 8.6 m point (where CDIP's model
+agreed at 6.8 ft); surf went from 9.5-11.8 to 6.1-7.6 ft against an observed ~4-5 ft. The wave height feeding it is checked (above); the breaking step isn't yet,
 and needs observations at the breaks.
 
 ## Known limitations

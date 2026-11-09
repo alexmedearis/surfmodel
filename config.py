@@ -34,6 +34,7 @@ REGIONS = {
 
 FINE_HALF_KM = 3.0        # fine grid extends this far from the spot in each direction
 FINE_RES_DEG = 1 / 10800  # 1/3 arc-second, ~10 m
+BREAK_DEPTH = 4.0         # surf height is computed here, in the breaking zone at the marked spot (m)
 FINE_SMOOTH_M = 30.0      # smoothing for ray stability (features << a wavelength don't refract rays)
 
 def coarse_path(region):

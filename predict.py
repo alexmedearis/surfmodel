@@ -18,12 +18,15 @@ def load_tables(region=None, kind="spot"):
     for s in config.load_spots(region, kind):
         p = config.table_path(s["slug"])
         if os.path.exists(p):
-            t = json.load(open(p)); t["W"] = np.array(t["W"]); tabs.append(t)
+            t = json.load(open(p)); t["W"] = np.array(t["W"])
+            if "W_break" in t:
+                t["W_break"] = np.array(t["W_break"])
+            tabs.append(t)
     return tabs
 
-def W_at(tab, T):
+def W_at(tab, T, key="W"):
     """Transfer row for period T (linear in frequency between table periods, clamped)."""
-    per = np.array(tab["periods"], float); Wtab = tab["W"]
+    per = np.array(tab["periods"], float); Wtab = tab[key]
     fq, f = 1 / per, 1 / np.clip(T, per.min(), per.max())
     j = np.clip(np.searchsorted(-fq, -f), 1, len(per) - 1)     # fq is decreasing
     w = (fq[j - 1] - f) / (fq[j - 1] - fq[j])
@@ -77,6 +80,14 @@ def predict(spec, tab, parts=None):
     swell = T >= 9
     hs = 4 * np.sqrt((E_site * df).sum())
     tp = T[E_site.argmax()]
+    # surf height from the breaking zone at the spot when there's a table for it (the swell keeps
+    # bending between the ~10 m model point and where it breaks), else from the model point
+    if "W_break" in tab:
+        E_b = (np.array([W_at(tab, t, "W_break") for t in T]) * S_off).sum(1) * DTH
+        hs_b, tp_b = 4 * np.sqrt((E_b * df).sum()), T[E_b.argmax()] if E_b.max() > 0 else tp
+        hb = breaking_height(hs_b, tp_b, tab["break_depth"]) if hs_b > 0 else 0.0
+    else:
+        hs_b, hb = np.nan, breaking_height(hs, tp, tab["depth"])
     comps = []
     for p in parts or []:
         e_off = (S_off * p["mask"] * df[:, None]).sum() * DTH
@@ -84,7 +95,7 @@ def predict(spec, tab, parts=None):
         comps.append(dict(label=label(p), hs_off=4 * np.sqrt(e_off), hs_site=4 * np.sqrt(e_site),
                           share=e_site / max((E_site * df).sum(), 1e-12)))
     return dict(slug=tab["slug"], name=tab["name"], hs=hs, hs_swell=4 * np.sqrt((E_site[swell] * df[swell]).sum()),
-                tp=tp, hb=breaking_height(hs, tp, tab["depth"]), depth=tab["depth"],
+                tp=tp, hb=hb, hs_break=hs_b, depth=tab["depth"],
                 E_site=E_site, S_off=S_off, S_site=S_site, comps=comps)
 
 def swells(spec, dirs=np.arange(0, 360, 5.0)):
