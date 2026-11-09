@@ -1,7 +1,7 @@
 # Surf model (prototype)
 
 Physics-based "spot filters" for California surf breaks, driven by live deep-water buoys
-(CDIP, or NOAA NDBC). Regions so far: SF Bay Area (checked against a nearshore buoy) and
+(CDIP, or NOAA NDBC) for right now and by NOAA's WaveWatch III swell forecast for the next 7 days. Regions so far: SF Bay Area (checked against a nearshore buoy) and
 Santa Cruz / Monterey Bay (checked against a buoy inside the bay). Set up to grow region by region.
 
 **Pipeline:** NOAA seafloor depths (~90 m regional grid + ~10 m nearshore grid per spot)
@@ -15,7 +15,8 @@ python fetch_bathy.py fine            # ~10 m nearshore grid for each new spot i
 python build_tables.py                # ray-trace each new spot (~1-2 min each, in parallel)
 python predict.py                     # live nowcast, broken down by swell; --what-if for scenarios
 python plot_components.py             # today's swells traced into each spot -> out/components_*.png
-python ribbons.py                     # interactive swell-ribbon map per spot -> out/ribbons_*.html
+python forecast.py santacruz          # NOAA WaveWatch III swell forecast at the region's input point
+python ribbons.py                     # interactive swell-ribbon map + 7-day forecast per spot -> out/ribbons_*.html
 python ribbons.py --at "2026-11-07 06:00" stinson   # same, for the buoy reading nearest a UTC time
 python validate.py bayarea 30         # check against nearshore buoys -> out/check_*.png
 python plot_filters.py                # spot filter heatmaps -> out/spot_filters_<region>.png
@@ -38,7 +39,9 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
 - `raytrace.py`: ray tracer, nested 10 m → 90 m tracing, transfer tables (Longuet-Higgins S·c·cg conservation)
 - `buoy.py`: CDIP and NOAA NDBC fetch (latest, nearest to a time; history for CDIP) + Maximum Entropy directional spectrum
 - `partition.py`: splits a spectrum into separate swells (watershed partitioning)
-- `predict.py`: nowcast at each spot, per swell
+- `forecast.py`: NOAA WaveWatch III (GFS-Wave) forecast spectra at buoy locations, cached in `data/forecast/`,
+  scaled to agree with the live buoy at the start
+- `predict.py`: nowcast at each spot, per swell (takes a buoy reading or a forecast hour)
 - `ribbons.py`, `ribbons_template.html`: consumer-style page showing each swell's real refracted path into a spot,
   on a zoomable map, with a fan per swell showing which of its directions reach the spot
 - `validate.py`: model vs nearshore buoys
@@ -55,8 +58,17 @@ Monterey Canyon buoy (CDIP 156, 133 m deep, inside Monterey Bay), predicted from
 Misses: ~3 ft low around Oct 24 (a swell the bay was more open to than the model thought) and
 2-4 ft high at the Nov 7-8 peak. Like SF Bar, this checks the regional grid, not the 10 m spot grids.
 
+Forecast (NOAA WaveWatch III, run through the same transfer tables), scored against the buoys
+for 7 runs from Nov 7-8 2026, up to 3 days ahead. That's ~2 days of one storm, so treat it as a first look:
+WaveWatch III came in 20-30% low offshore at 46042 during the Nov 7-8 peak. Scaling it to the live buoy
+at the start (correction fading over ~24 h) brought CDIP 156 errors from 2.1 to 0.9 ft RMSE on day 1 and
+from 1.4 to 0.9 ft on days 2-3. At SF Bar it was already good (1.0-1.2 ft; WaveWatch III's own nearshore
+point there: 2.2 ft), and the scaling made it slightly worse (1.2-1.4 ft), because there WaveWatch III's low
+bias had been cancelling a small high bias of ours. Needs a longer record.
+
 ## Known limitations
 - Ray theory ignores diffraction, so it under-predicts energy leaking into sheltered corners.
   The 10 m grids are smoothed to ~30 m because finer features don't bend swell-length waves.
 - No wind, tide, currents or sandbars. Breaker heights use a generic formula and are **uncalibrated**.
-- Nowcast only. Forecasts need WaveWatch III spectra as input instead of the buoy.
+- The forecast is swell only (no wind or tide yet). WaveWatch III's 10° direction bins are coarser than a
+  buoy's, and NOAA keeps only ~2 days of runs online, so scoring the forecast means logging it ourselves.

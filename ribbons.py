@@ -4,6 +4,7 @@ into a spot, drawn as a ribbon whose width is the swell's height along the way.
   python ribbons.py [slug ...]                  -> out/ribbons_<slug>.html (open in a browser)
   python ribbons.py --at "2026-11-07 06:00"     replay the buoy reading nearest that UTC time
   python ribbons.py --hours-ago 24 linda-mar    or one about that long ago
+  python ribbons.py --no-forecast               skip the 7-day forecast (always skipped with --at)
 
 How a ribbon is built:
   1. Trace wave rays backward from the spot at the swell's peak period (10 m grid near
@@ -27,6 +28,7 @@ import datetime as dt
 from buoy import latest, nearest
 from predict import load_tables, predict, swells, W_at, M2FT
 from partition import label, compass
+import forecast
 
 VIEW_SEAWARD, VIEW_HALF = 5500, (9500, 10000)    # coast map: centred this far out to sea, ~19 x 20 km
 COLORS = ["#1D9E75", "#D85A30", "#7F77DD", "#BA7517", "#D4537E"]
@@ -283,7 +285,21 @@ def direction_fan(tab, p, r, df):
                 open=np.round(np.clip(frac[keep], 0, 1), 3).tolist(),
                 window=np.round(np.clip(Wp / ref, 0, 1), 2).tolist())
 
-def build(tab, spec, parts, coarse):
+def forecast_series(tab, fc):
+    """Breakers at the spot for each forecast hour, plus the swells making them up."""
+    hours = []
+    for s, parts in zip(fc["specs"], fc["parts"]):
+        r = predict(s, tab, parts)
+        sw = sorted(((c["hs_site"] * M2FT, c["hs_off"] * M2FT, p) for p, c in zip(parts, r["comps"])),
+                    key=lambda x: -x[0])
+        hours.append(dict(t=int(s["time"].timestamp()), lo=round(r["hb"] * M2FT * 0.8, 1), hi=round(r["hb"] * M2FT * 1.2, 1),
+                          off=round(s["hs"] * M2FT, 1), tp=round(r["tp"]),
+                          sw=[[f"{p['tp']:.0f}s {compass(p['dp'])}", round(h, 1), round(o, 1), round(p["dp"])]
+                              for h, o, p in sw[:3] if o >= 0.8]))
+    return dict(run=int(fc["run"].timestamp()), point=fc["point"], gain=round(fc["gain"], 2), hours=hours,
+                lat=round(tab["lat"], 3), lon=round(tab["lon"], 3))
+
+def build(tab, spec, parts, coarse, fc=None):
     fine = Bathy.fine(tab["slug"])
     frame = Frame(tab["lat"], tab["lon"])
     r = predict(spec, tab, parts)
@@ -344,7 +360,7 @@ def build(tab, spec, parts, coarse):
                 views=dict(coast=dict(box=COAST_VIEW, land=cpoly, bands=cband, depth=cdepth),
                            cove=dict(box=cove_box, land=fpoly, bands=fband, depth=fdepth,
                                      extent=[round(float(fx0)), round(float(fx1)), round(float(fy0)), round(float(fy1))])),
-                swells=swells_out)
+                swells=swells_out, forecast=forecast_series(tab, fc) if fc else None)
 
 if __name__ == "__main__":
     args = sys.argv[1:]
@@ -354,7 +370,7 @@ if __name__ == "__main__":
     if "--hours-ago" in args:                          # e.g. --hours-ago 24 to replay yesterday
         i = args.index("--hours-ago")
         when = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=float(args[i + 1])); del args[i:i + 2]
-    slugs = args
+    slugs = [a for a in args if not a.startswith("--")]
     spots = [s for s in config.load_spots(kind="spot") if not slugs or s["slug"] in slugs]
     tpl = open(os.path.join(config.HERE, "ribbons_template.html")).read()
     for region in dict.fromkeys(s["region"] for s in spots):
@@ -365,10 +381,22 @@ if __name__ == "__main__":
         spec = nearest(stn, when) if when else latest(stn); spec["stn"] = stn
         print(f"{config.REGIONS[region]['name']}: buoy {stn} at {spec['time']:%Y-%m-%d %H:%M} UTC", flush=True)
         parts = swells(spec)
+        fc = None
+        if "--no-forecast" not in sys.argv and not when:
+            try:
+                specs = forecast.load(region)
+                gain = forecast.nudge(specs, spec)
+                specs = [x for x in specs if x["time"] >= spec["time"] - dt.timedelta(hours=1.5)]
+                fc = dict(specs=specs, parts=[swells(x) for x in specs], run=specs[0]["run"], gain=gain,
+                          point=config.REGIONS[region]["forecast_point"])
+                print(f"  forecast: WaveWatch III run {fc['run']:%Y-%m-%d %HZ}, {len(specs)} steps, "
+                      f"scaled x{gain:.2f} to match the buoy", flush=True)
+            except Exception as e:                       # the page still builds without it
+                print("  forecast unavailable:", e, flush=True)
         coarse = Bathy.coarse(region)
         for tab in tabs:
             print(tab["name"], flush=True)
-            data = build(tab, spec, parts, coarse)
+            data = build(tab, spec, parts, coarse, fc)
             out = os.path.join(config.OUT, f"ribbons_{tab['slug']}.html")
             open(out, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
             print("  saved", os.path.relpath(out, config.HERE))

@@ -30,7 +30,11 @@ def W_at(tab, T):
     return (1 - w) * Wtab[j - 1] + w * Wtab[j]
 
 def offshore(spec, dirs):
-    """Offshore S(f, θ) in m²/Hz/rad from the buoy's directional moments."""
+    """Offshore S(f, θ) in m²/Hz/rad: from a forecast's full spectrum, or from a buoy's
+    directional moments."""
+    if "S2d" in spec:
+        from forecast import on_dirs
+        return on_dirs(spec, dirs)
     return spec["E"][:, None] * mem(spec["a1"], spec["b1"], spec["a2"], spec["b2"], dirs)
 
 def breaking_height(hs_site, T, h_site):

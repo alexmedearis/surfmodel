@@ -16,11 +16,13 @@ REGIONS = {
         name="SF Bay Area",
         bbox=(37.0, 38.0, -123.40, -122.35),          # lat_s, lat_n, lon_w, lon_e
         input_buoy="029",                             # Point Reyes (deep water, unsheltered)
+        forecast_point="46214",                       # WaveWatch III output at the same buoy
     ),
     "santacruz": dict(
         name="Santa Cruz / Monterey Bay",
         bbox=(36.45, 37.25, -122.65, -121.75),
         input_buoy="ndbc:46042",                      # NOAA Monterey, ~1,700 m deep, outside the bay
+        forecast_point="46042",
     ),                                                # (CDIP 156 sits inside the bay, already sheltered)
     # Planned. Each needs its coarse grid fetched (fetch_bathy.py coarse <region>) and spots added.
     # SoCal needs a large domain so the Channel Islands' shadows are inside it.
