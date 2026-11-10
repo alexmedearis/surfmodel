@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Surf spots</title>
+<link rel="stylesheet" href="css/spot.css">
+<style>
+.spots{list-style:none;margin:8px 0 0;padding:0}
+.spots li+li{border-top:1px solid var(--line)}
+.spots a{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 2px;color:var(--text);text-decoration:none}
+.spots a:hover .nm{color:var(--deep)}
+.spots .nm{font-weight:600}
+.spots .kind{color:var(--muted);font-size:13px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:20px 0 0}
+</style>
+</head>
+<body>
+<main>
+<div class="card">
+  <h1>Surf spots</h1>
+  <p class="sub">Swell, surf height and a 7-day forecast, from a wave model of each spot's real seafloor.</p>
+  <div id="list"><p class="status">Loading…</p></div>
+</div>
+</main>
+<script src="config.js"></script>
+<script src="js/data.js"></script>
+<script>
+const KIND={beach:"Beach break",reef:"Reef break",point:"Point break",jetty:"Jetty"};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+getJSON(`${SURF.dataRoot}/${SURF.api}/spots/index.json`).then(d=>{
+  const regions={};
+  for(const s of d.spots)(regions[s.region_name]??=[]).push(s);
+  document.getElementById("list").innerHTML=Object.entries(regions).map(([r,ss])=>
+    `<h2>${esc(r)}</h2><ul class="spots">${ss.map(s=>
+      `<li><a href="spot.html?spot=${encodeURIComponent(s.slug)}"><span class="nm">${esc(s.name)}</span><span class="kind">${esc(KIND[s.break_type]||"")}</span></a></li>`).join("")}</ul>`).join("");
+}).catch(e=>{document.getElementById("list").innerHTML=`<p class="status">Couldn't load the spot list: ${esc(e.message)}.</p>`});
+</script>
+</body>
+</html>

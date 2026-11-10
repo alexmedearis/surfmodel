@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Surf</title>
+<link rel="stylesheet" href="css/spot.css">
+</head>
+<body>
+<!--WEB-->
+<nav class="crumb"><a href="./">All spots</a></nav>
+<p class="status" id="status">Loading…</p>
+<!--/WEB-->
+<main hidden>
+<div class="card">
+  <div class="top">
+    <div><h1 id="spot"></h1><div class="sub" id="when"></div></div>
+    <div class="size"><div class="big" id="size"></div><div class="sub">surf height</div></div>
+  </div>
+  <p class="summary" id="summary"></p>
+  <div class="bar-row">
+    <div class="seg" role="tablist" aria-label="Map zoom">
+      <button id="z-coast" class="on" role="tab" onclick="setView('coast')">Coast</button>
+      <button id="z-cove" role="tab" onclick="setView('cove')">Close up</button>
+    </div>
+    <span class="hint">Drag to move · scroll or pinch to zoom · tap a swell to focus</span>
+  </div>
+  <div class="map"><svg id="map" role="img" aria-label="Map of swells bending into the spot. Drag to move, scroll or pinch to zoom."></svg>
+    <div class="zoom"><button onclick="zoomBtn(2)" aria-label="Zoom in">+</button><button onclick="zoomBtn(0.5)" aria-label="Zoom out">−</button><button onclick="setView('coast')" aria-label="Show the whole map" style="font-size:14px">⤢</button></div></div>
+  <div class="legend" id="legend"></div>
+  <div class="rows" id="rows"></div>
+  <details class="foot">
+    <summary>How to read this</summary>
+    <p><b>Surf height</b> is the face height of the waves as they break: the low number is the typical bigger
+      waves, the high number the sets. Swell heights (offshore, and "here" for each swell) are the standard
+      average-height measure buoys use, so they're smaller than the faces you'd see breaking.</p>
+    <p>Each ribbon is one swell, following the path it takes as it bends over the real seafloor (NOAA depth data).
+      Its width is the swell's estimated height along the way, so you can see it shrink as it wraps in.
+      The moving dots show the direction of travel.</p>
+    <p>A dashed line is a swell that's out there but misses this spot. It's drawn from the part of the swell aimed most
+      directly at the spot, and stops at the ring, the closest that part ever gets. The dotted line shows the gap.
+      Darker water is deeper; the thin lines are the 10, 20 and 50 m depth contours.</p>
+    <p>The small fan next to each swell shows its spread of directions offshore: the dashed outline is all of it,
+      the solid part is what reaches the spot. Tap a swell to see its fan over the map, with a grey ring marking the
+      directions that are open to the spot.</p>
+    <p>Zoom in toward the spot and the map switches to a detailed 10 m depth grid, and thin colored lines appear:
+      individual wave paths, so you can see them fan out or focus on the reef.</p>
+  </details>
+</div>
+<div class="card fc" id="fc" hidden>
+  <h2>Next 7 days</h2>
+  <p class="sub" id="fc-sub">Surf height at the spot, from NOAA's swell forecast run through this spot's model.</p>
+  <div class="days" id="fc-days"></div>
+  <div class="chart" id="fc-chart"><svg id="fc-svg" role="img" aria-label="Chart of forecast wave height over the next 7 days"></svg><div class="tip" id="fc-tip"></div></div>
+  <div class="fkey"><span><svg width="22" height="10"><rect x="0" y="1" width="22" height="8" rx="2" fill="var(--deep)" opacity=".3"/><line x1="0" y1="5" x2="22" y2="5" stroke="var(--deep)" stroke-width="2"/></svg>Surf height here</span>
+    <span><svg width="22" height="10"><line x1="0" y1="5" x2="22" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>Swell height offshore</span>
+    <span><svg width="14" height="10"><rect width="14" height="10" rx="2" fill="var(--chip)"/></svg>Night</span></div>
+  <p class="note" id="fc-note"></p>
+</div>
+<div class="card water" id="water">
+  <h2>In the water</h2>
+  <p class="sub" id="lineup-sub">What this mix of swells looks like at the break, from above, with the beach at the bottom.</p>
+  <div id="water-summary" class="wsum"></div>
+  <div class="lineup-wrap"><canvas id="lineup" aria-label="Animated view of the swells arriving at the break"></canvas></div>
+  <div class="lineup-ctl">
+    <div id="lineup-swells" class="togs"></div>
+    <div class="btns"><button id="lineup-orient" class="btn" hidden>Ocean at top</button><button id="lineup-play" class="btn">Pause</button><button id="lineup-speed" class="btn">Real speed</button></div>
+  </div>
+  <p class="note" id="lineup-note">Simplified: a straight beach on a smooth, sloping bottom. The angle and mix of swells come from the model;
+    where exactly it peaks depends on sandbars and reef, which it doesn't know. Turn swells off to see what each one adds.</p>
+</div>
+</main>
+<!--APP-->
+<script src="config.js"></script>
+<script src="js/data.js"></script>
+<script>bootSpot(["js/common.js","js/map.js","js/forecast.js","js/lineup.js"])</script>
+<!--/APP-->
+</body>
+</html>

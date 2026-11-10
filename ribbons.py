@@ -7,10 +7,11 @@
   python ribbons.py --no-lineup                 skip the "In the water" wave field (faster)
 
 Everything on the page is computed by the products/ package (map, current swells, lineup,
-forecast); this script fetches the inputs, calls them, and pastes the result into
-ribbons_template.html. See products/geometry.py for how the swell paths are built.
+forecast); this script fetches the inputs, calls them, and pastes the result into the
+website's spot page (web/spot.html with its CSS and scripts inlined), making one file that
+opens without a server. See products/geometry.py for how the swell paths are built.
 """
-import json, os, sys, datetime as dt
+import json, os, re, sys, datetime as dt
 import config
 from common import Bathy
 from inputs import region_inputs
@@ -28,6 +29,19 @@ def build(tab, spec, parts, coarse, fc=None, with_lineup=True):
     lu = spot_lineup(tab, coarse, fine, now["swells"]) if with_lineup else None
     return page_data(spot_map(tab, coarse, fine), now, spot_forecast(tab, fc) if fc else None, lu)
 
+def standalone_template():
+    """web/spot.html as a single file: CSS and scripts inlined, the website-only parts (loader,
+    spot-list link) removed, and a /*DATA*/null placeholder for the data."""
+    web = os.path.join(config.HERE, "web")
+    read = lambda p: open(os.path.join(web, p)).read()
+    html = read("spot.html")
+    html = html.replace('<link rel="stylesheet" href="css/spot.css">', "<style>\n" + read("css/spot.css") + "</style>")
+    html = re.sub(r"<!--WEB-->.*?<!--/WEB-->\n", "", html, flags=re.S).replace("<main hidden>", "<main>")
+    app = re.search(r"<!--APP-->.*?<!--/APP-->", html, re.S)
+    scripts = json.loads(re.search(r"bootSpot\((\[.*?\])\)", app.group(0)).group(1))
+    js = "const DATA=/*DATA*/null;\n" + "".join(read(p) for p in scripts)
+    return html[:app.start()] + "<script>\n" + js.replace("</script", "<\\/script") + "</script>" + html[app.end():]
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     when = None
@@ -38,7 +52,7 @@ if __name__ == "__main__":
         when = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=float(args[i + 1])); del args[i:i + 2]
     slugs = [a for a in args if not a.startswith("--")]
     spots = [s for s in config.load_spots(kind="spot") if not slugs or s["slug"] in slugs]
-    tpl = open(os.path.join(config.HERE, "ribbons_template.html")).read()
+    tpl = standalone_template()
     for region in dict.fromkeys(s["region"] for s in spots):
         tabs = [t for t in load_tables(region) if t["slug"] in {s["slug"] for s in spots}]
         if not tabs:
@@ -48,5 +62,5 @@ if __name__ == "__main__":
             print(tab["name"], flush=True)
             data = build(tab, I["spec"], I["parts"], I["coarse"], I["fc"], with_lineup="--no-lineup" not in sys.argv)
             out = os.path.join(config.OUT, f"ribbons_{tab['slug']}.html")
-            open(out, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
+            open(out, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":")).replace("</", "<\\/")))
             print("  saved", os.path.relpath(out, config.HERE))

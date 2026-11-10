@@ -18,6 +18,7 @@ python plot_components.py             # today's swells traced into each spot -> 
 python forecast.py santacruz          # NOAA WaveWatch III swell forecast at the region's input point
 python ribbons.py                     # interactive swell-ribbon map + 7-day forecast per spot -> out/ribbons_*.html
 python publish.py                     # the same data as files for the website/app -> out/data/v1/spots/<slug>/
+python serve.py                       # the website, reading those files -> http://localhost:8000
 python ribbons.py --at "2026-11-07 06:00" stinson   # same, for the buoy reading nearest a UTC time
 python validate.py bayarea 30         # check against nearshore buoys -> out/check_*.png
 python check_mop.py                   # check each spot's 10 m grid against CDIP's MOP nearshore model -> out/check_mop.png
@@ -54,8 +55,11 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
   per forecast run). `geometry.py` has the map frame and swell-path tracing; `page.py` assembles the pieces into
   the object the HTML page reads. None of them write files, so the same functions will feed the website's
   data files (and later a mobile app).
-- `ribbons.py`, `ribbons_template.html`: builds the current spot pages from `products/` (map, swell paths, fans,
-  forecast, lineup)
+- `web/`: the website. `index.html` lists the spots; `spot.html?spot=<slug>` shows one. `js/data.js` fetches
+  the spot's published files and assembles the page's data; `js/common.js`, `map.js`, `forecast.js` and
+  `lineup.js` draw it; `config.js` says where the data lives. `serve.py` runs it locally.
+- `ribbons.py`: builds single-file spot pages (out/ribbons_*.html, open without a server) from `products/`,
+  using the website's page with its CSS and scripts inlined, so there's one copy of the page code
 - `publish.py`, `inputs.py`: write each spot's products as files (`map.json`, `now.json`, `forecast.json`,
   `lineup.json` + `lineup.bin`, plus `spots/index.json`) under a versioned `v1/` path, through a storage
   layer that's a local folder now (Google Cloud Storage at deploy time, picked with `--store` / `SURF_STORE`).
