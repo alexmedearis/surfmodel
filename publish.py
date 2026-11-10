@@ -7,6 +7,7 @@
 
 Layout under the store root (versioned, so old app versions keep working when the format changes):
   v1/spots/index.json                  the spots: slug, name, region, position, break type
+  v1/spots/conditions.json             every spot's current surf height and key facts (for the spot list)
   v1/spots/<slug>/map.json             coastline, depth, map views              (once per spot)
   v1/spots/<slug>/now.json             current swells, paths, surf height       (each buoy reading)
   v1/spots/<slug>/lineup.json + .bin   "In the water" wave field: JSON header + raw grids
@@ -28,10 +29,12 @@ from products.spot_map import spot_map
 from products.spot_now import spot_now
 from products.spot_lineup import spot_lineup
 from products.spot_forecast import spot_forecast
+from products.insights import conditions
+from products.geometry import Frame, shore_normal
 
 API = "v1"
 PRODUCTS = ("map", "now", "lineup", "forecast")
-CACHE_SECONDS = dict(map=86400, now=300, lineup=300, forecast=900, index=300)   # for the CDN, later
+CACHE_SECONDS = dict(map=86400, now=300, lineup=300, forecast=900, index=300, conditions=300)   # for the CDN, later
 
 # ---------- storage ----------
 
@@ -120,12 +123,10 @@ def publish_spot(store, tab, I, only=PRODUCTS):
         sizes[name] = len(data)
     if "map" in only:
         put("map.json", _json(spot_map(tab, I["coarse"], fine)))
-    now = None
+    now = lu = None
     if "now" in only or "lineup" in only:
         now = spot_now(tab, I["spec"], I["parts"], I["coarse"], fine)
         now["buoy_time"] = I["spec"]["time"].strftime("%Y-%m-%dT%H:%M:%SZ")
-        if "now" in only:
-            put("now.json", _json(now))
     if "lineup" in only:
         lu = spot_lineup(tab, I["coarse"], fine, now["swells"])
         if lu is None:                               # nothing reaching the spot: say so, don't leave an old field
@@ -134,6 +135,10 @@ def publish_spot(store, tab, I, only=PRODUCTS):
             header, blob = pack_binary(lu)
             put("lineup.bin", blob, "application/octet-stream", "lineup")
             put("lineup.json", _json(dict(header, bin_file="lineup.bin", bin_bytes=len(blob))))
+    if "now" in only:
+        sn = round(shore_normal(fine, Frame(tab["lat"], tab["lon"])))
+        now["insights"] = conditions(now, lu, sn)
+        put("now.json", _json(now))
     if "forecast" in only and I["fc"]:               # keep the last forecast if NOAA is unreachable
         put("forecast.json", _json(spot_forecast(tab, I["fc"])))
     return sizes
@@ -144,10 +149,30 @@ def publish_index(store):
         if os.path.exists(config.table_path(s["slug"])):
             spots.append(dict(slug=s["slug"], name=s["name"], region=s["region"],
                               region_name=config.REGIONS[s["region"]]["name"], lat=s["lat"], lon=s["lon"],
-                              break_type=s.get("break") or ""))
+                              break_type=config.break_type(s["slug"])))
     store.put(f"{API}/spots/index.json", _json(dict(schema_version=1, spots=spots)),
               cache_seconds=CACHE_SECONDS["index"])
     return len(spots)
+
+def publish_conditions(store, slugs=None):
+    """conditions.json: each spot's surf height and key facts from its published now.json, so the
+    spot list needs one small file instead of every spot's data. Returns how many spots."""
+    rows = []
+    for s in config.load_spots(kind="spot"):
+        try:
+            n = json.loads(store.get(spot_path(s["slug"], "now.json")))
+        except FileNotFoundError:
+            continue
+        ins = n.get("insights") or {}
+        main = ins.get("main_swell") or {}
+        peel = ins.get("peel") or {}
+        rows.append(dict(slug=s["slug"], surf_ft=n["breakers"], hs_ft=n["hs_ft"], main=main.get("short"),
+                         period=main.get("period"), favors=ins.get("favors"), mix=ins.get("mix"),
+                         peel=dict(side=peel["side"], cls=peel["cls"]) if peel.get("cls") else None,
+                         buoy_time=n.get("buoy_time"), updated=n.get("generated_at")))
+    store.put(f"{API}/spots/conditions.json", _json(dict(schema_version=1, spots=rows)),
+              cache_seconds=CACHE_SECONDS["conditions"])
+    return len(rows)
 
 # ---------- reading back (what the website does in JavaScript; used by tests and the backend) ----------
 
@@ -165,6 +190,36 @@ def load_spot(store, slug):
     out["lineup"] = lu if lu and lu.get("swells") else None
     return out
 
+def publish(store, only=PRODUCTS, slugs=None, when=None):
+    """Publish `only` for the given spots (default all), then the index and conditions files.
+    A spot that fails is reported and skipped, so one bad spot doesn't stop the rest.
+    Returns the slugs that failed."""
+    spots = [s for s in config.load_spots(kind="spot") if not slugs or s["slug"] in slugs]
+    print(f"publishing {', '.join(only)} to {store}", flush=True)
+    failed = []
+    for region in dict.fromkeys(s["region"] for s in spots):
+        tabs = [t for t in load_tables(region) if t["slug"] in {s["slug"] for s in spots}]
+        if not tabs:
+            continue
+        try:
+            I = region_inputs(region, when, with_forecast="forecast" in only)
+        except Exception as e:                       # e.g. the buoy feed is down
+            print(f"  {region}: couldn't get the inputs: {e!r}", flush=True)
+            failed += [t["slug"] for t in tabs]
+            continue
+        for tab in tabs:
+            print(tab["name"], flush=True)
+            try:
+                sizes = publish_spot(store, tab, I, only)
+                print("  wrote " + ", ".join(f"{k} {v / 1e3:.0f} KB" for k, v in sizes.items()), flush=True)
+            except Exception as e:
+                print(f"  FAILED: {e!r}", flush=True)
+                failed.append(tab["slug"])
+    print(f"index: {publish_index(store)} spots", flush=True)
+    if "now" in only:
+        print(f"conditions: {publish_conditions(store)} spots", flush=True)
+    return failed
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     when, store_spec, only = None, None, PRODUCTS
@@ -177,17 +232,6 @@ if __name__ == "__main__":
         bad = set(only) - set(PRODUCTS)
         if bad:
             sys.exit(f"unknown product(s) {', '.join(bad)}: choose from {', '.join(PRODUCTS)}")
-    store = get_store(store_spec)
-    slugs = [a for a in args if not a.startswith("--")]
-    spots = [s for s in config.load_spots(kind="spot") if not slugs or s["slug"] in slugs]
-    print(f"publishing {', '.join(only)} to {store}")
-    for region in dict.fromkeys(s["region"] for s in spots):
-        tabs = [t for t in load_tables(region) if t["slug"] in {s["slug"] for s in spots}]
-        if not tabs:
-            continue
-        I = region_inputs(region, when, with_forecast="forecast" in only)
-        for tab in tabs:
-            print(tab["name"], flush=True)
-            sizes = publish_spot(store, tab, I, only)
-            print("  wrote " + ", ".join(f"{k} {v / 1e3:.0f} KB" for k, v in sizes.items()), flush=True)
-    print(f"index: {publish_index(store)} spots")
+    failed = publish(get_store(store_spec), only, [a for a in args if not a.startswith("--")], when)
+    if failed:
+        sys.exit(f"failed: {', '.join(failed)}")

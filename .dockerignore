@@ -1,0 +1,15 @@
+# Only the code and the model's own data go in the image.
+.git
+.github
+.claude
+.venv
+**/__pycache__
+**/*.pyc
+.DS_Store
+out
+web
+tests
+data/forecast
+data/forecast_log
+data/sessions
+*.md

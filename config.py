@@ -56,3 +56,7 @@ def load_spots(region=None, kind=None):
         if (region is None or r["region"] == region) and (kind is None or r["kind"] == kind):
             out.append(r)
     return out
+
+def break_type(slug):
+    """The spot's kind of break from spots.csv: beach, reef, point, jetty, or "" if not set."""
+    return next((r.get("break") or "" for r in load_spots() if r["slug"] == slug), "")

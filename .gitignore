@@ -7,3 +7,5 @@ data/forecast/
 data/sessions/
 # published data files (python publish.py); regenerated every run
 out/data/
+# scratch output of make check
+out/snapshot-check/
