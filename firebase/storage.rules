@@ -1,0 +1,15 @@
+rules_version = '2';
+// Published model data (written only by the jobs' service account, which bypasses these rules).
+// Readable by anyone for now; when the site becomes paid, gate the premium files here, e.g.
+//   allow read: if request.auth != null && request.auth.token.subscriber == true;
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /v1/{path=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

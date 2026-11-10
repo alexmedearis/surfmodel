@@ -13,3 +13,9 @@ data/forecast
 data/forecast_log
 data/sessions
 *.md
+build
+.emulator-data
+firebase
+deploy
+docker-compose.yml
+firebase.json

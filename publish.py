@@ -56,9 +56,37 @@ class LocalStore:
         return self.root
 
 class CloudStore:
-    """Google Cloud Storage bucket (gs://bucket/prefix). Comes with the deployment step."""
+    """A Cloud Storage bucket: gs://bucket or gs://bucket/prefix (the Firebase Storage bucket when
+    deployed). Credentials come from the environment: the job's service account on Cloud Run,
+    `gcloud auth application-default login` on a laptop. With STORAGE_EMULATOR_HOST set (e.g.
+    http://127.0.0.1:9199) it writes to the local Firebase Storage emulator instead.
+    Each upload replaces the whole object at once, so readers never see half a file."""
     def __init__(self, url):
-        raise NotImplementedError("Cloud Storage publishing isn't set up yet; use a local store for now")
+        from google.cloud import storage                 # only needed when publishing to the cloud
+        bucket, _, prefix = url[len("gs://"):].partition("/")
+        self.url, self.prefix = url.rstrip("/"), prefix.strip("/")
+        emulator = os.environ.get("STORAGE_EMULATOR_HOST")
+        if emulator:
+            from google.auth.credentials import AnonymousCredentials
+            client = storage.Client(project=os.environ.get("GOOGLE_CLOUD_PROJECT", "demo-surf"),
+                                    credentials=AnonymousCredentials(), client_options={"api_endpoint": emulator})
+        else:
+            client = storage.Client()
+        self.bucket = client.bucket(bucket)
+    def _key(self, path):
+        return f"{self.prefix}/{path}" if self.prefix else path
+    def put(self, path, data, content_type="application/json", cache_seconds=300):
+        blob = self.bucket.blob(self._key(path))
+        blob.cache_control = f"public, max-age={cache_seconds}"
+        blob.upload_from_string(data, content_type=content_type)
+    def get(self, path):
+        from google.api_core.exceptions import NotFound
+        try:
+            return self.bucket.blob(self._key(path)).download_as_bytes()
+        except NotFound:
+            raise FileNotFoundError(path)
+    def __str__(self):
+        return self.url
 
 def get_store(spec=None):
     spec = spec or os.environ.get("SURF_STORE") or "local:" + os.path.join(config.OUT, "data")

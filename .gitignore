@@ -9,3 +9,9 @@ data/sessions/
 out/data/
 # scratch output of make check
 out/snapshot-check/
+
+# website built for an environment (deploy/build_web.py)
+build/
+# Firebase emulator data saved between runs
+.emulator-data/
+*.log

@@ -2,14 +2,18 @@
 // the same object products/page.py builds for the standalone pages, so the renderers
 // (common.js, map.js, forecast.js, lineup.js) work unchanged either way.
 //
-// Where the files live is set by config.js (window.SURF_CONFIG.dataRoot): a local folder when
-// developing (serve.py), the Cloud Storage / CDN address when deployed.
+// Where the files live is set by config.js (window.SURF_CONFIG): `dataRoot`, a plain folder
+// (serve.py), or `storage` {host, bucket}: the Firebase Storage bucket the jobs publish to
+// (the local emulator, staging or production; see deploy/).
 const SURF = Object.assign({dataRoot: "data", api: "v1"}, window.SURF_CONFIG || {});
+const dataURL = path => SURF.storage
+  ? `${SURF.storage.host}/v0/b/${SURF.storage.bucket}/o/${encodeURIComponent(`${SURF.api}/${path}`)}?alt=media`
+  : `${SURF.dataRoot}/${SURF.api}/${path}`;
 const SCHEMA_VERSION = 1;                     // the file format this page understands
 const FILE_META = ["schema_version", "slug", "generated_at", "buoy_time", "bin_file", "bin_bytes"];
 const BIN_TYPES = {uint8: Uint8Array, uint16le: Uint16Array};   // every browser platform is little-endian
 
-const spotBase = slug => `${SURF.dataRoot}/${SURF.api}/spots/${encodeURIComponent(slug)}/`;
+const spotFile = (slug, name) => dataURL(`spots/${encodeURIComponent(slug)}/${name}`);
 
 async function getJSON(url, optional) {
   const r = await fetch(url);
@@ -48,13 +52,12 @@ const pageFields = d => {                     // drop the file labels, keep the 
 };
 
 async function loadSpot(slug) {
-  const base = spotBase(slug);
   const [m, n, f, lu] = await Promise.all([
-    getJSON(base + "map.json"), getJSON(base + "now.json"),
-    getJSON(base + "forecast.json", true), getJSON(base + "lineup.json", true)]);
+    getJSON(spotFile(slug, "map.json")), getJSON(spotFile(slug, "now.json")),
+    getJSON(spotFile(slug, "forecast.json"), true), getJSON(spotFile(slug, "lineup.json"), true)]);
   let lineup = null;
   if (lu && lu.swells && lu.swells.length) {
-    const r = await fetch(base + lu.bin_file);
+    const r = await fetch(spotFile(slug, lu.bin_file));
     if (!r.ok) throw new Error(`couldn't load ${lu.bin_file} (${r.status})`);
     const buf = await r.arrayBuffer();
     if (buf.byteLength !== lu.bin_bytes) throw new Error("the wave data is being updated; reload in a moment");

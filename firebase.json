@@ -1,0 +1,22 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["**/.*"],
+    "headers": [
+      {"source": "/config.js", "headers": [{"key": "Cache-Control", "value": "no-cache"}]},
+      {"source": "**/*.@(js|css)", "headers": [{"key": "Cache-Control", "value": "public, max-age=300"}]}
+    ]
+  },
+  "storage": {"rules": "firebase/storage.rules"},
+  "firestore": {"rules": "firebase/firestore.rules"},
+  "emulators": {
+    "singleProjectMode": true,
+    "ui": {"enabled": true, "host": "0.0.0.0", "port": 4000},
+    "hub": {"host": "0.0.0.0", "port": 4400},
+    "logging": {"host": "0.0.0.0", "port": 4500},
+    "hosting": {"host": "0.0.0.0", "port": 5050},
+    "storage": {"host": "0.0.0.0", "port": 9199},
+    "auth": {"host": "0.0.0.0", "port": 9099},
+    "firestore": {"host": "0.0.0.0", "port": 8080, "websocketPort": 9150}
+  }
+}

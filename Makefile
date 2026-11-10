@@ -4,9 +4,11 @@ IMAGE   ?= surfmodel
 PORT    ?= 8000
 DATA    ?= $(CURDIR)/out/data
 SNAP    ?=
+ENV     ?= staging
+JOB     ?= all
 CHECKDIR ?= $(CURDIR)/out/snapshot-check
 
-.PHONY: help install publish hourly forecast nightly serve dev pages check snapshot \
+.PHONY: emulators emulator-job cloud-setup deploy cloud-job help install publish hourly forecast nightly serve dev pages check snapshot \
         docker-build docker-hourly docker-forecast docker-nightly docker-all
 
 help:                ## list the tasks
@@ -38,6 +40,20 @@ check:               ## compare with the baseline, directly and via published fi
 	@test -n "$(SNAP)" || (echo "set SNAP=<dir> (recorded with make snapshot)"; exit 1)
 	$(PY) tests/snapshot.py check $(SNAP)
 	$(PY) tests/snapshot.py check-published $(SNAP) $(CHECKDIR)
+
+emulators:           ## the whole system locally (Firebase emulators in Docker): site :5050, emulator UI :4000
+	$(PY) deploy/build_web.py emulator
+	mkdir -p .emulator-data build
+	docker compose up --build emulators
+emulator-job:        ## run a job into the emulators (while `make emulators` runs): make emulator-job JOB=all
+	docker compose run --rm --build jobs $(JOB)
+
+cloud-setup:         ## one-time setup of a cloud environment: make cloud-setup ENV=staging
+	deploy/setup.sh $(ENV)
+deploy:              ## deploy jobs, schedules and the site: make deploy ENV=staging (or prod)
+	deploy/deploy.sh $(ENV)
+cloud-job:           ## run a job in the cloud now and wait for it: make cloud-job ENV=staging JOB=all
+	. deploy/$(ENV).env && gcloud run jobs execute surf-nightly --project="$$PROJECT" --region="$$REGION" --args=$(JOB) --wait
 
 docker-build:        ## build the jobs image
 	docker build -t $(IMAGE) .

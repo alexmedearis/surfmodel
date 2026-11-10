@@ -33,6 +33,27 @@ python calibrate.py                   # fit per-spot surf-height corrections fro
 python plot_filters.py                # spot filter heatmaps -> out/spot_filters_<region>.png
 ```
 
+## Environments and deploying
+The same code and Docker image run in four places; `deploy/<env>.env` holds each one's settings.
+
+| | data written by | website served by | data read from |
+|---|---|---|---|
+| local | `make publish` (Python) | `make serve` (:8000) | `out/data` |
+| emulator | `make emulator-job` (Docker) | `make emulators` (:5050, UI :4000) | Firebase Storage emulator |
+| staging / prod | Cloud Run Jobs on Cloud Scheduler | Firebase Hosting | Firebase Storage |
+
+- **Emulators**: `make emulators` starts the Firebase emulators (Storage, Hosting, Auth, Firestore) in Docker,
+  then `make emulator-job JOB=all` publishes into them. The project id `demo-surf` can't reach a real project.
+  Emulated data is kept in `.emulator-data/` between runs.
+- **Cloud**: one Firebase project per environment, on the Blaze plan, with Storage and Hosting started in the
+  console. Put its id and bucket in `deploy/<env>.env`, then `make cloud-setup ENV=staging` once,
+  `make deploy ENV=staging` for each release, and `make cloud-job ENV=staging JOB=all` to fill it right away.
+  Prod deploys only from a committed tree.
+- The jobs: `surf-hourly` (:10 past each hour), `surf-forecast` (05:40, 11:40, 17:40, 23:40 UTC),
+  `surf-nightly` (10:20 UTC), each 2 CPU / 2 GB (a full run peaks around 0.7 GB and takes ~1.5 min).
+- Data is public-read under `v1/` (`firebase/storage.rules`); that's where paid access gets enforced later.
+- The forecast log still runs as a GitHub Action (`.github/workflows/forecast-log.yml`).
+
 ## Adding spots and regions
 - **Spot in an existing region:** add a row to `spots.csv` (`kind=spot`, `depth` = model point depth,
   10 m by default), then `fetch_bathy.py fine <slug>` and `build_tables.py <slug>`.
@@ -74,6 +95,8 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
   back the way the website will. `inputs.py` fetches a region's buoy reading and forecast for both scripts.
 - `jobs.py`: the scheduled jobs (`hourly`, `forecast`, `nightly`, `all`) on top of `publish.py`. A spot
   that fails is skipped and reported (non-zero exit) so the others still publish.
+- `firebase.json`, `firebase/` (rules, emulator image), `docker-compose.yml`, `deploy/` (environment settings,
+  `build_web.py`, `setup.sh`, `deploy.sh`): Firebase and Google Cloud, see "Environments and deploying"
 - `Dockerfile`, `requirements.txt`, `Makefile`: one image with the model, its data and the jobs; the job name
   is the argument and `SURF_STORE` says where to write (`docker run -v "$PWD/out/data:/data" surfmodel hourly`).
 - `tests/snapshot.py`: regression check: rebuilds every spot from fixed inputs and compares with a recording

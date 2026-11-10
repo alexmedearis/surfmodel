@@ -34,14 +34,13 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 const KIND={beach:"Beach break",reef:"Reef break",point:"Point break",jetty:"Jetty"};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const PEEL={slow:"slow",makeable:"makeable",fast:"fast",closeout:"closing out"};
-const root=`${SURF.dataRoot}/${SURF.api}/spots/`;
 function now(c){                                     // "4–5 ft" and a short line about the swell
   if(!c)return"";
   const bits=[c.main?`${c.main}`:"",c.peel?`${PEEL[c.peel.cls]} ${c.peel.side}s`:c.favors==="peaks"?"peaky":c.favors?`favors ${c.favors}`:""].filter(Boolean);
   return`<span class="now"><span class="ft">${c.surf_ft[0]}–${c.surf_ft[1]} ft</span><span class="what">${esc(bits.join(" · "))}</span></span>`;
 }
 const ago=t=>{const m=Math.round((Date.now()-Date.parse(t))/60000);return m<2?"just now":m<90?`${m} min ago`:`${Math.round(m/60)} h ago`};
-Promise.all([getJSON(root+"index.json"),getJSON(root+"conditions.json",true).catch(()=>null)]).then(([d,c])=>{
+Promise.all([getJSON(dataURL("spots/index.json")),getJSON(dataURL("spots/conditions.json"),true).catch(()=>null)]).then(([d,c])=>{
   const cond=Object.fromEntries((c?.spots||[]).map(x=>[x.slug,x]));
   const regions={};
   for(const s of d.spots)(regions[s.region_name]??=[]).push(s);

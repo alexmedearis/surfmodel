@@ -1,0 +1,26 @@
+# The whole system on one laptop, the way it runs in the cloud:
+#   docker compose up emulators           Firebase emulators: site http://localhost:5050, UI http://localhost:4000
+#   docker compose run --rm jobs all      run a job (all / hourly / forecast / nightly) into the emulated bucket
+# (make emulators / make emulator-job JOB=all do the same.) The project id starts with "demo-",
+# which the emulators treat as local-only: nothing here can touch a real Firebase project.
+services:
+  emulators:
+    build: firebase/emulator
+    # keep the emulated data between runs (import it if a previous run saved some)
+    entrypoint: ["sh", "/work/firebase/emulator/start.sh"]
+    volumes:
+      - ./firebase.json:/work/firebase.json:ro
+      - ./firebase:/work/firebase:ro
+      - ./build/web:/work/build/web:ro
+      - ./.emulator-data:/work/state        # saved data in state/data, temp files beside it
+    ports: ["4000:4000", "4400:4400", "4500:4500", "5050:5050", "8080:8080", "9099:9099", "9199:9199", "9150:9150"]
+    stop_grace_period: 30s       # time to save the emulated data on the way down
+
+  jobs:
+    build: .
+    profiles: ["jobs"]           # only runs when asked: docker compose run --rm jobs <job>
+    depends_on: [emulators]
+    environment:
+      SURF_STORE: gs://demo-surf.firebasestorage.app
+      STORAGE_EMULATOR_HOST: http://emulators:9199
+      GOOGLE_CLOUD_PROJECT: demo-surf
