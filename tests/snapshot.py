@@ -3,36 +3,39 @@ and a cached WaveWatch III run) and save or compare the result.
 
   python tests/snapshot.py save  <dir>     record
   python tests/snapshot.py check <dir>     rebuild and compare exactly with the recording
+  python tests/snapshot.py check-published <dir> <tmp>   same, but via the published data files
 
 Used to make sure refactors don't change what the model publishes. The inputs still come from
 the network (buoy archives) and data/forecast/, so the recording is only valid while those are.
 """
 import json, os, sys, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import config, forecast
-from buoy import nearest
-from common import Bathy
-from predict import load_tables, swells
+import config
+from predict import load_tables
 
 WHEN = dt.datetime(2026, 11, 9, 18, 0, tzinfo=dt.timezone.utc)
 RUN = ("20261109", "12")
 
-def build_all():
-    import ribbons
+def build_all(published_to=None):
+    """Page data for every spot from the fixed inputs. With `published_to` (a folder), go the
+    long way: publish the data files there, read them back, and assemble the page from those,
+    which checks the whole publish/read path too."""
+    import ribbons, publish
+    from products.page import page_data
+    from inputs import region_inputs
+    store = publish.LocalStore(published_to) if published_to else None
     out = {}
     for region in ("bayarea", "santacruz"):
-        stn = config.REGIONS[region]["input_buoy"]
-        spec = nearest(stn, WHEN); spec["stn"] = stn
-        parts = swells(spec)
-        specs = forecast.load(region, run=RUN)
-        gain = forecast.nudge(specs, spec)
-        specs = [x for x in specs if x["time"] >= spec["time"] - dt.timedelta(hours=1.5)]
-        fc = dict(specs=specs, parts=[swells(x) for x in specs], run=specs[0]["run"], gain=gain,
-                  point=config.REGIONS[region]["forecast_point"])
-        coarse = Bathy.coarse(region)
+        I = region_inputs(region, WHEN, run=RUN)
         for tab in load_tables(region):
             print(tab["name"], flush=True)
-            out[tab["slug"]] = json.loads(json.dumps(ribbons.build(tab, spec, parts, coarse, fc), separators=(",", ":")))
+            if store:
+                publish.publish_spot(store, tab, I)
+                P = publish.load_spot(store, tab["slug"])
+                data = page_data(P["map"], P["now"], P["forecast"], P["lineup"])
+            else:
+                data = ribbons.build(tab, I["spec"], I["parts"], I["coarse"], I["fc"])
+            out[tab["slug"]] = json.loads(json.dumps(data, separators=(",", ":")))
     return out
 
 def diff(a, b, path=""):
@@ -56,7 +59,7 @@ def diff(a, b, path=""):
 
 if __name__ == "__main__":
     mode, d = sys.argv[1], sys.argv[2]
-    data = build_all()
+    data = build_all(sys.argv[3] if mode == "check-published" else None)
     os.makedirs(d, exist_ok=True)
     if mode == "save":
         for slug, v in data.items():

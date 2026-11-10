@@ -3,4 +3,7 @@ __pycache__/
 .venv/
 .DS_Store
 data/forecast/
-data/sessions/          # where and when you surf: private
+# where and when you surf: private
+data/sessions/
+# published data files (python publish.py); regenerated every run
+out/data/

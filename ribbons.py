@@ -11,10 +11,10 @@ forecast); this script fetches the inputs, calls them, and pastes the result int
 ribbons_template.html. See products/geometry.py for how the swell paths are built.
 """
 import json, os, sys, datetime as dt
-import config, forecast
+import config
 from common import Bathy
-from buoy import latest, nearest
-from predict import load_tables, swells
+from inputs import region_inputs
+from predict import load_tables
 from products.spot_map import spot_map
 from products.spot_now import spot_now
 from products.spot_lineup import spot_lineup
@@ -27,22 +27,6 @@ def build(tab, spec, parts, coarse, fc=None, with_lineup=True):
     now = spot_now(tab, spec, parts, coarse, fine)
     lu = spot_lineup(tab, coarse, fine, now["swells"]) if with_lineup else None
     return page_data(spot_map(tab, coarse, fine), now, spot_forecast(tab, fc) if fc else None, lu)
-
-def load_forecast(region, spec):
-    """The newest WaveWatch III run for the region, scaled to the buoy reading `spec`, from
-    that reading onward; None (with a note) if NOAA's server can't be reached."""
-    try:
-        specs = forecast.load(region)
-        gain = forecast.nudge(specs, spec)
-        specs = [x for x in specs if x["time"] >= spec["time"] - dt.timedelta(hours=1.5)]
-        fc = dict(specs=specs, parts=[swells(x) for x in specs], run=specs[0]["run"], gain=gain,
-                  point=config.REGIONS[region]["forecast_point"])
-        print(f"  forecast: WaveWatch III run {fc['run']:%Y-%m-%d %HZ}, {len(specs)} steps, "
-              f"scaled x{gain:.2f} to match the buoy", flush=True)
-        return fc
-    except Exception as e:                           # the page still builds without it
-        print("  forecast unavailable:", e, flush=True)
-        return None
 
 if __name__ == "__main__":
     args = sys.argv[1:]
@@ -59,15 +43,10 @@ if __name__ == "__main__":
         tabs = [t for t in load_tables(region) if t["slug"] in {s["slug"] for s in spots}]
         if not tabs:
             continue
-        stn = config.REGIONS[region]["input_buoy"]
-        spec = nearest(stn, when) if when else latest(stn); spec["stn"] = stn
-        print(f"{config.REGIONS[region]['name']}: buoy {stn} at {spec['time']:%Y-%m-%d %H:%M} UTC", flush=True)
-        parts = swells(spec)
-        fc = load_forecast(region, spec) if "--no-forecast" not in sys.argv and not when else None
-        coarse = Bathy.coarse(region)
+        I = region_inputs(region, when, with_forecast="--no-forecast" not in sys.argv)
         for tab in tabs:
             print(tab["name"], flush=True)
-            data = build(tab, spec, parts, coarse, fc, with_lineup="--no-lineup" not in sys.argv)
+            data = build(tab, I["spec"], I["parts"], I["coarse"], I["fc"], with_lineup="--no-lineup" not in sys.argv)
             out = os.path.join(config.OUT, f"ribbons_{tab['slug']}.html")
             open(out, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
             print("  saved", os.path.relpath(out, config.HERE))

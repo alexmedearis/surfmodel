@@ -17,6 +17,7 @@ python predict.py                     # live nowcast, broken down by swell; --wh
 python plot_components.py             # today's swells traced into each spot -> out/components_*.png
 python forecast.py santacruz          # NOAA WaveWatch III swell forecast at the region's input point
 python ribbons.py                     # interactive swell-ribbon map + 7-day forecast per spot -> out/ribbons_*.html
+python publish.py                     # the same data as files for the website/app -> out/data/v1/spots/<slug>/
 python ribbons.py --at "2026-11-07 06:00" stinson   # same, for the buoy reading nearest a UTC time
 python validate.py bayarea 30         # check against nearshore buoys -> out/check_*.png
 python check_mop.py                   # check each spot's 10 m grid against CDIP's MOP nearshore model -> out/check_mop.png
@@ -55,8 +56,14 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
   data files (and later a mobile app).
 - `ribbons.py`, `ribbons_template.html`: builds the current spot pages from `products/` (map, swell paths, fans,
   forecast, lineup)
+- `publish.py`, `inputs.py`: write each spot's products as files (`map.json`, `now.json`, `forecast.json`,
+  `lineup.json` + `lineup.bin`, plus `spots/index.json`) under a versioned `v1/` path, through a storage
+  layer that's a local folder now (Google Cloud Storage at deploy time, picked with `--store` / `SURF_STORE`).
+  `--only now,lineup` publishes just some products, for scheduling them separately. `load_spot()` reads a spot
+  back the way the website will. `inputs.py` fetches a region's buoy reading and forecast for both scripts.
 - `tests/snapshot.py`: regression check: rebuilds every spot from fixed inputs and compares with a recording
-  (`save <dir>` / `check <dir>`), so refactors can't silently change what's published
+  (`save <dir>` / `check <dir>`; `check-published <dir> <tmp>` goes through the published files and back),
+  so refactors can't silently change what's published
 - `lineup.py`: real-geometry lineup for the "In the water" view. Forward rays from deep water over the spot's
   ~10 m grid (five directions across the swell's spread) give crest positions, heights, set arrival times and
   where each size of wave breaks; the break line's angle to the crest is the peel angle (Walker 1974, Hutt et

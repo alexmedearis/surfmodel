@@ -1,15 +1,15 @@
 """The "In the water" wave field (lineup.py) for the swells reaching a spot: crest phase, height,
 breaking threshold and set arrival time on a grid around the break, plus break lines and peel.
 
-The grids are packed small (8- and 16-bit), base64 inside the page for now; published on their
-own they'd be a binary file next to a small JSON header."""
-import base64, numpy as np
+The grids are packed small (8- and 16-bit numpy arrays). The page gets them base64-encoded
+(page.py); published, they go in a binary file next to a small JSON header (publish.py)."""
+import numpy as np
 import config, lineup as LU
 from predict import M2FT
 from . import SCHEMA_VERSION
 
-def _b64(a, dtype):
-    return base64.b64encode(np.ascontiguousarray(a, dtype=dtype).tobytes()).decode()
+def _pack(a, dtype):
+    return np.ascontiguousarray(a, dtype=dtype)
 
 def spot_lineup(tab, coarse, fine, swells):
     """`swells`: the swells list from spot_now (their strands say which directions get in)."""
@@ -33,10 +33,10 @@ def spot_lineup(tab, coarse, fine, swells):
         pl = LU.peel(dict(F, bth=bth), H0)
         tg = F["tg"]; tg0 = np.nanmin(tg) if np.isfinite(tg).any() else 0
         out.append(dict(i=swells.index(s), T=round(float(F["T"]), 2), H0=round(H0, 2), frm=round(frm),
-                        ph=_b64(np.round((F["phase"] % (2 * np.pi)) / (2 * np.pi) * 256) % 256, np.uint8),
-                        K=_b64(np.clip(np.nan_to_num(K) * 100, 0, 255).round(), np.uint8),
-                        bth=_b64(np.where(np.isfinite(bth), np.clip(bth * 20, 0, 254), 255).round(), np.uint8),
-                        tg=_b64(np.clip(np.nan_to_num(tg - tg0, nan=0) * 10, 0, 65535).round(), "<u2"),
+                        ph=_pack(np.round((F["phase"] % (2 * np.pi)) / (2 * np.pi) * 256) % 256, np.uint8),
+                        K=_pack(np.clip(np.nan_to_num(K) * 100, 0, 255).round(), np.uint8),
+                        bth=_pack(np.where(np.isfinite(bth), np.clip(bth * 20, 0, 254), 255).round(), np.uint8),
+                        tg=_pack(np.clip(np.nan_to_num(tg - tg0, nan=0) * 10, 0, 65535).round(), "<u2"),
                         peel=[dict(x=np.round(g["x"][::2], 1).tolist(), y=np.round(g["y"][::2], 1).tolist(),
                                    angle=round(float(np.median(g["angle"])), 0), right=g["right"],
                                    dir=[round(float(np.mean(g["vx"])), 3), round(float(np.mean(g["vy"])), 3)],
@@ -48,5 +48,5 @@ def spot_lineup(tab, coarse, fine, swells):
     spot = next(r for r in config.load_spots() if r["slug"] == tab["slug"])
     sx, sy = fine.to_xy(spot["lat"], spot["lon"])
     return dict(schema_version=SCHEMA_VERSION, slug=tab["slug"],
-                nc=nc, cell=LU.CELL_M, depth=_b64(np.clip(h * 8, 0, 255).round(), np.uint8), swells=out,
+                nc=nc, cell=LU.CELL_M, depth=_pack(np.clip(h * 8, 0, 255).round(), np.uint8), swells=out,
                 spot=[round(float(sx) - F["x0"], 1), round(float(sy) - F["y0"], 1)], break_type=spot.get("break") or "")
