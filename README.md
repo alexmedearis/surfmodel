@@ -47,8 +47,16 @@ python plot_filters.py                # spot filter heatmaps -> out/spot_filters
 - `forecast.py`: NOAA WaveWatch III (GFS-Wave) forecast spectra at buoy locations, cached in `data/forecast/`,
   scaled to agree with the live buoy at the start
 - `predict.py`: nowcast at each spot, per swell (takes a buoy reading or a forecast hour)
-- `ribbons.py`, `ribbons_template.html`: consumer-style page showing each swell's real refracted path into a spot,
-  on a zoomable map, with a fan per swell showing which of its directions reach the spot
+- `products/`: what the model publishes per spot, as plain data, split by how often it changes:
+  `spot_map` (coastline, depth, views; once per spot), `spot_now` (current swells, their paths and fans, surf
+  height; per buoy reading), `spot_lineup` (the "In the water" wave field), `spot_forecast` (7-day series;
+  per forecast run). `geometry.py` has the map frame and swell-path tracing; `page.py` assembles the pieces into
+  the object the HTML page reads. None of them write files, so the same functions will feed the website's
+  data files (and later a mobile app).
+- `ribbons.py`, `ribbons_template.html`: builds the current spot pages from `products/` (map, swell paths, fans,
+  forecast, lineup)
+- `tests/snapshot.py`: regression check: rebuilds every spot from fixed inputs and compares with a recording
+  (`save <dir>` / `check <dir>`), so refactors can't silently change what's published
 - `lineup.py`: real-geometry lineup for the "In the water" view. Forward rays from deep water over the spot's
   ~10 m grid (five directions across the swell's spread) give crest positions, heights, set arrival times and
   where each size of wave breaks; the break line's angle to the crest is the peel angle (Walker 1974, Hutt et
