@@ -45,10 +45,11 @@ The same code and Docker image run in four places; `deploy/<env>.env` holds each
 - **Emulators**: `make emulators` starts the Firebase emulators (Storage, Hosting, Auth, Firestore) in Docker,
   then `make emulator-job JOB=all` publishes into them. The project id `demo-surf` can't reach a real project.
   Emulated data is kept in `.emulator-data/` between runs.
-- **Cloud**: one Firebase project per environment, on the Blaze plan, with Storage and Hosting started in the
-  console. Put its id and bucket in `deploy/<env>.env`, then `make cloud-setup ENV=staging` once,
-  `make deploy ENV=staging` for each release, and `make cloud-job ENV=staging JOB=all` to fill it right away.
-  Prod deploys only from a committed tree.
+- **Cloud**: for now there's one Firebase project, production (`deploy/prod.env`), on the Blaze plan with
+  Storage and Hosting started in the console; the emulators are the testing ground. `make cloud-setup` once,
+  `make deploy` for each release (only from a committed tree), `make cloud-job JOB=all` to fill it right away.
+  A separate staging project (`deploy/staging.env`, `ENV=staging`) gets added with accounts and payments,
+  when a mistake could affect paying customers.
 - The jobs: `surf-hourly` (:10 past each hour), `surf-forecast` (05:40, 11:40, 17:40, 23:40 UTC),
   `surf-nightly` (10:20 UTC), each 2 CPU / 2 GB (a full run peaks around 0.7 GB and takes ~1.5 min).
 - Data is public-read under `v1/` (`firebase/storage.rules`); that's where paid access gets enforced later.

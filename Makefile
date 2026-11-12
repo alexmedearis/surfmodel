@@ -4,7 +4,7 @@ IMAGE   ?= surfmodel
 PORT    ?= 8000
 DATA    ?= $(CURDIR)/out/data
 SNAP    ?=
-ENV     ?= staging
+ENV     ?= prod
 JOB     ?= all
 CHECKDIR ?= $(CURDIR)/out/snapshot-check
 
@@ -48,11 +48,11 @@ emulators:           ## the whole system locally (Firebase emulators in Docker):
 emulator-job:        ## run a job into the emulators (while `make emulators` runs): make emulator-job JOB=all
 	docker compose run --rm --build jobs $(JOB)
 
-cloud-setup:         ## one-time setup of a cloud environment: make cloud-setup ENV=staging
+cloud-setup:         ## one-time setup of the cloud project: make cloud-setup (ENV=prod by default)
 	deploy/setup.sh $(ENV)
-deploy:              ## deploy jobs, schedules and the site: make deploy ENV=staging (or prod)
+deploy:              ## deploy jobs, schedules and the site: make deploy (ENV=prod by default)
 	deploy/deploy.sh $(ENV)
-cloud-job:           ## run a job in the cloud now and wait for it: make cloud-job ENV=staging JOB=all
+cloud-job:           ## run a job in the cloud now and wait for it: make cloud-job JOB=all
 	. deploy/$(ENV).env && gcloud run jobs execute surf-nightly --project="$$PROJECT" --region="$$REGION" --args=$(JOB) --wait
 
 docker-build:        ## build the jobs image
