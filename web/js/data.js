@@ -52,9 +52,10 @@ const pageFields = d => {                     // drop the file labels, keep the 
 };
 
 async function loadSpot(slug) {
-  const [m, n, f, lu] = await Promise.all([
+  const [m, n, f, lu, wx] = await Promise.all([
     getJSON(spotFile(slug, "map.json")), getJSON(spotFile(slug, "now.json")),
-    getJSON(spotFile(slug, "forecast.json"), true), getJSON(spotFile(slug, "lineup.json"), true)]);
+    getJSON(spotFile(slug, "forecast.json"), true), getJSON(spotFile(slug, "lineup.json"), true),
+    getJSON(spotFile(slug, "weather.json"), true).catch(() => null)]);
   let lineup = null;
   if (lu && lu.swells && lu.swells.length) {
     const r = await fetch(spotFile(slug, lu.bin_file));
@@ -69,6 +70,7 @@ async function loadSpot(slug) {
     hs_ft: n.hs_ft, main: n.main, views: m.views, swells: n.swells,
     forecast: pageFields(f), lineup,
     insights: n.insights || null, facts: m.facts || null,     // website extras (insights.py)
+    weather: pageFields(wx),                                  // wind, tide, rating (spot_weather.py)
     updated: {now: n.generated_at, buoy: n.buoy_time, forecast: f && f.generated_at},
   };
 }

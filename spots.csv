@@ -1,10 +1,10 @@
-slug,name,region,lat,lon,depth,kind,station,mop,break
-linda-mar,Linda Mar,bayarea,37.5960,-122.5030,10,spot,,SM376,beach
-ocean-beach,Ocean Beach,bayarea,37.7600,-122.5120,10,spot,,SF029,beach
-mavericks,Mavericks,bayarea,37.4935,-122.5000,10,spot,,SM305,reef
-stinson,Stinson,bayarea,37.8990,-122.6430,10,spot,,MA123,beach
-princeton-jetty,Princeton Jetty,bayarea,37.4975,-122.4770,10,spot,,SM297,jetty
-sf-bar-buoy,SF Bar buoy (check),bayarea,37.7881,-122.6325,,buoy,142,,
-steamer-lane,Steamer Lane,santacruz,36.9513,-122.0262,10,spot,,SC149,point
-pleasure-point,Pleasure Point,santacruz,36.9547,-121.9707,10,spot,,SC117,reef
-monterey-canyon-buoy,Monterey Canyon buoy (check),santacruz,36.7592,-121.9503,,buoy,156,,
+slug,name,region,lat,lon,depth,kind,station,mop,break,tide
+linda-mar,Linda Mar,bayarea,37.5960,-122.5030,10,spot,,SM376,beach,9414131
+ocean-beach,Ocean Beach,bayarea,37.7600,-122.5120,10,spot,,SF029,beach,9414275
+mavericks,Mavericks,bayarea,37.4935,-122.5000,10,spot,,SM305,reef,9414131
+stinson,Stinson,bayarea,37.8990,-122.6430,10,spot,,MA123,beach,9414906
+princeton-jetty,Princeton Jetty,bayarea,37.4975,-122.4770,10,spot,,SM297,jetty,9414131
+sf-bar-buoy,SF Bar buoy (check),bayarea,37.7881,-122.6325,,buoy,142,,,
+steamer-lane,Steamer Lane,santacruz,36.9513,-122.0262,10,spot,,SC149,point,9413745
+pleasure-point,Pleasure Point,santacruz,36.9547,-121.9707,10,spot,,SC117,reef,9413745
+monterey-canyon-buoy,Monterey Canyon buoy (check),santacruz,36.7592,-121.9503,,buoy,156,,,

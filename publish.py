@@ -12,6 +12,7 @@ Layout under the store root (versioned, so old app versions keep working when th
   v1/spots/<slug>/now.json             current swells, paths, surf height       (each buoy reading)
   v1/spots/<slug>/lineup.json + .bin   "In the water" wave field: JSON header + raw grids
   v1/spots/<slug>/forecast.json        7-day forecast                           (each forecast run)
+  v1/spots/<slug>/weather.json         wind, tide and surf rating, hourly for 7 days (every hour)
 
 Every JSON file carries schema_version and generated_at. The lineup grids are in lineup.bin; in
 lineup.json each one is {"bin": {"offset", "length", "dtype"}} pointing into it (little-endian).
@@ -29,12 +30,14 @@ from products.spot_map import spot_map
 from products.spot_now import spot_now
 from products.spot_lineup import spot_lineup
 from products.spot_forecast import spot_forecast
-from products.insights import conditions
+from products.spot_weather import spot_weather
+from products.insights import conditions, wind_state, tide_state, rating
+import weather as W
 from products.geometry import Frame, shore_normal
 
 API = "v1"
-PRODUCTS = ("map", "now", "lineup", "forecast")
-CACHE_SECONDS = dict(map=86400, now=300, lineup=300, forecast=900, index=300, conditions=300)   # for the CDN, later
+PRODUCTS = ("map", "now", "lineup", "forecast", "weather")
+CACHE_SECONDS = dict(map=86400, now=300, lineup=300, forecast=900, weather=300, index=300, conditions=300)   # for the CDN, later
 
 # ---------- storage ----------
 
@@ -151,6 +154,16 @@ def publish_spot(store, tab, I, only=PRODUCTS):
         sizes[name] = len(data)
     if "map" in only:
         put("map.json", _json(spot_map(tab, I["coarse"], fine)))
+    fc = None
+    if "forecast" in only and I["fc"]:               # keep the last forecast if NOAA is unreachable
+        fc = spot_forecast(tab, I["fc"])
+        put("forecast.json", _json(fc))
+    # wind and tide: only for the latest reading (a replay of a past time would get today's)
+    wind = tide = None
+    if I.get("live", True) and ("now" in only or "weather" in only):
+        wind = W.wind_forecast(tab["lat"], tab["lon"])
+        tide = W.tide_predictions(config.tide_station(tab["slug"]))
+    sn = round(shore_normal(fine, Frame(tab["lat"], tab["lon"])))
     now = lu = None
     if "now" in only or "lineup" in only:
         now = spot_now(tab, I["spec"], I["parts"], I["coarse"], fine)
@@ -164,11 +177,25 @@ def publish_spot(store, tab, I, only=PRODUCTS):
             put("lineup.bin", blob, "application/octet-stream", "lineup")
             put("lineup.json", _json(dict(header, bin_file="lineup.bin", bin_bytes=len(blob))))
     if "now" in only:
-        sn = round(shore_normal(fine, Frame(tab["lat"], tab["lon"])))
-        now["insights"] = conditions(now, lu, sn)
+        ins = conditions(now, lu, sn)
+        t = I["spec"]["time"].timestamp()
+        w = None
+        if wind and wind["hours"]:
+            h = min(wind["hours"], key=lambda h: abs(h[0] + 1800 - t))
+            ins["wind"] = w = wind_state(h[1], h[2], h[3], sn)
+        if tide:
+            ins["tide"] = tide_state(tide["events"], t, W.tide_at)
+        tp = (ins.get("main_swell") or {}).get("period") or 8
+        ins["rating"] = dict(rating(now["breakers"][0], now["breakers"][1], tp, w), wind_known=w is not None)
+        now["insights"] = ins
         put("now.json", _json(now))
-    if "forecast" in only and I["fc"]:               # keep the last forecast if NOAA is unreachable
-        put("forecast.json", _json(spot_forecast(tab, I["fc"])))
+    if "weather" in only and (wind or tide):
+        if fc is None:
+            try:
+                fc = json.loads(store.get(spot_path(tab["slug"], "forecast.json")))
+            except FileNotFoundError:
+                pass
+        put("weather.json", _json(spot_weather(tab, wind, tide, sn, fc)))
     return sizes
 
 def publish_index(store):
@@ -200,7 +227,15 @@ def publish_conditions(store, slugs=None):
             fc = [[h["t"], round(h["lo"]), round(h["hi"])] for h in fc["hours"]]
         except FileNotFoundError:
             fc = []
-        rows.append(dict(slug=s["slug"], surf_ft=n["breakers"], hs_ft=n["hs_ft"], main=main.get("short"),
+        try:
+            wx = json.loads(store.get(spot_path(s["slug"], "weather.json")))
+            rt = [r for r in wx["rating"] if r[0] % 10800 == 0]          # every 3 hours is plenty for the list
+        except FileNotFoundError:
+            rt = []
+        w, td = ins.get("wind") or {}, ins.get("tide") or {}
+        rows.append(dict(slug=s["slug"], rating=ins.get("rating"), wind=dict(kt=w["kt"], rel=w["rel"], dir=w["dir"]) if w else None,
+                         tide=dict(ft=td["ft"], rising=td["rising"]) if td else None, ratings=rt,
+                         surf_ft=n["breakers"], hs_ft=n["hs_ft"], main=main.get("short"),
                          period=main.get("period"), dir=main.get("dir"), favors=ins.get("favors"), mix=ins.get("mix"),
                          peel=dict(side=peel["side"], cls=peel["cls"]) if peel.get("cls") else None,
                          buoy_time=n.get("buoy_time"), updated=n.get("generated_at"), forecast=fc))
@@ -217,7 +252,7 @@ def load_spot(store, slug):
             return json.loads(store.get(spot_path(slug, name)))
         except FileNotFoundError:
             return None
-    out = {k: get_json(f"{k}.json") for k in ("map", "now", "forecast")}
+    out = {k: get_json(f"{k}.json") for k in ("map", "now", "forecast", "weather")}
     lu = get_json("lineup.json")
     if lu and lu.get("swells"):
         lu = unpack_binary(lu, store.get(spot_path(slug, lu["bin_file"])))
@@ -250,7 +285,7 @@ def publish(store, only=PRODUCTS, slugs=None, when=None):
                 print(f"  FAILED: {e!r}", flush=True)
                 failed.append(tab["slug"])
     print(f"index: {publish_index(store)} spots", flush=True)
-    if "now" in only or "forecast" in only:
+    if {"now", "forecast", "weather"} & set(only):
         print(f"conditions: {publish_conditions(store)} spots", flush=True)
     return failed
 

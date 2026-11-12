@@ -57,7 +57,8 @@ The same code and Docker image run in four places; `deploy/<env>.env` holds each
 
 ## Adding spots and regions
 - **Spot in an existing region:** add a row to `spots.csv` (`kind=spot`, `depth` = model point depth,
-  10 m by default), then `fetch_bathy.py fine <slug>` and `build_tables.py <slug>`.
+  10 m by default, `tide` = the nearest open-coast NOAA tide station), then `fetch_bathy.py fine <slug>` and
+  `build_tables.py <slug>`.
 - **Check buoy:** a row with `kind=buoy` and the CDIP `station`; `validate.py` compares it with the model.
 - **New region:** fill in its entry in `config.py` (box and deep-water input buoy; North Coast,
   SLO and SoCal are sketched there but not built or checked), then `fetch_bathy.py coarse <region>`
@@ -72,17 +73,22 @@ The same code and Docker image run in four places; `deploy/<env>.env` holds each
 - `raytrace.py`: ray tracer, nested 10 m → 90 m tracing, transfer tables (Longuet-Higgins S·c·cg conservation)
 - `buoy.py`: CDIP and NOAA NDBC fetch (latest, nearest to a time; history for CDIP) + Maximum Entropy directional spectrum
 - `partition.py`: splits a spectrum into separate swells (watershed partitioning)
+- `weather.py`: wind forecast (NOAA National Weather Service, api.weather.gov) and tide predictions (NOAA
+  CO-OPS) for a spot; the `tide` column in spots.csv names each spot's tide station (an open-coast one, not
+  inside a bay or lagoon). Both are public-domain US government data, fine for a commercial product.
 - `forecast.py`: NOAA WaveWatch III (GFS-Wave) forecast spectra at buoy locations, cached in `data/forecast/`,
   scaled to agree with the live buoy at the start
 - `predict.py`: nowcast at each spot, per swell (takes a buoy reading or a forecast hour)
 - `products/`: what the model publishes per spot, as plain data, split by how often it changes:
   `spot_map` (coastline, depth, views; once per spot), `spot_now` (current swells, their paths and fans, surf
   height; per buoy reading), `spot_lineup` (the "In the water" wave field), `spot_forecast` (7-day series;
-  per forecast run). `geometry.py` has the map frame and swell-path tracing; `page.py` assembles the pieces into
+  per forecast run), `spot_weather` (wind, tide and surf rating, hourly for 7 days; every hour). `geometry.py` has the map frame and swell-path tracing; `page.py` assembles the pieces into
   the object the HTML page reads. None of them write files, so the same functions will feed the website's
   data files (and later a mobile app). `insights.py` turns them into short facts every client can show the
   same way: the spot's swell window (in `map.json` as `facts`) and what today's swells do there (main swell,
-  arrival angle, favors lefts/rights, peel side and speed, swell mix; in `now.json` as `insights`).
+  arrival angle, favors lefts/rights, peel side and speed, swell mix, wind relative to the beach, tide, and a
+  0-5 surf rating from size, period and wind; in `now.json` as `insights`). Tide isn't in the rating yet:
+  which tide each spot likes has to be learned from session reports.
 - `web/`: the website. `index.html` lists the spots; `spot.html?spot=<slug>` shows one. `js/data.js` fetches
   the spot's published files and assembles the page's data; `js/common.js`, `map.js`, `forecast.js` and
   `lineup.js` draw it; `config.js` says where the data lives. `serve.py` runs it locally.

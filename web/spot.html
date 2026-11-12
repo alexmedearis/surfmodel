@@ -58,9 +58,11 @@
   <p class="sub" id="fc-sub">Surf height at the spot, from NOAA's swell forecast run through this spot's model.</p>
   <div class="days" id="fc-days"></div>
   <div class="chart" id="fc-chart"><svg id="fc-svg" role="img" aria-label="Chart of forecast wave height over the next 7 days"></svg><div class="tip" id="fc-tip"></div></div>
+  <svg id="fc-wx" class="wx" role="img" aria-label="Rating, wind and tide over the next 7 days"></svg>
   <div class="fkey"><span><svg width="30" height="10"><defs><linearGradient id="fkey-size"><stop offset="0" stop-color="#1fa2c7"/><stop offset=".33" stop-color="#12a888"/><stop offset=".66" stop-color="#e59a1d"/><stop offset="1" stop-color="#d23c78"/></linearGradient></defs><rect x="0" y="1" width="30" height="8" rx="2" fill="url(#fkey-size)" opacity=".35"/><line x1="0" y1="5" x2="30" y2="5" stroke="url(#fkey-size)" stroke-width="2.5"/></svg>Surf height here, colored by size</span>
     <span><svg width="22" height="10"><line x1="0" y1="5" x2="22" y2="5" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>Swell height offshore</span>
     <span><svg width="14" height="10"><rect width="14" height="10" rx="2" fill="var(--chip)"/></svg>Night</span></div>
+  <div class="wx-key" id="wx-key"><span style="--c:#2c9f68"><i></i>offshore / glassy</span><span style="--c:#d4a020"><i></i>cross-shore</span><span style="--c:#d6493f"><i></i>onshore</span><span>· rating:</span><span style="--c:#e2774a"><i></i>poor</span><span style="--c:#e3b03a"><i></i>fair</span><span style="--c:#3fb56c"><i></i>good</span><span style="--c:#159a8c"><i></i>very good</span><span style="--c:#7a5bd6"><i></i>epic</span></div>
   <p class="note" id="fc-note"></p>
 </div>
 <div class="card water" id="water">

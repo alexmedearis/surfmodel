@@ -60,3 +60,7 @@ def load_spots(region=None, kind=None):
 def break_type(slug):
     """The spot's kind of break from spots.csv: beach, reef, point, jetty, or "" if not set."""
     return next((r.get("break") or "" for r in load_spots() if r["slug"] == slug), "")
+
+def tide_station(slug):
+    """The NOAA tide prediction station for a spot (spots.csv "tide" column), or None."""
+    return next((r.get("tide") or None for r in load_spots() if r["slug"] == slug), None)

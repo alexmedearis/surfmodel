@@ -1,7 +1,7 @@
 """The scheduled jobs that keep the published data current. Each runs the same way on a laptop,
 in the Docker image, and (later) as a Cloud Run Job on a schedule.
 
-  python jobs.py hourly      current swells, surf height, lineup, spot-list conditions   (every hour)
+  python jobs.py hourly      current swells, surf height, lineup, wind, tide, rating     (every hour)
   python jobs.py forecast    7-day forecast from the newest WaveWatch III run            (every 6 hours)
   python jobs.py nightly     maps and the spot index                                     (once a day)
   python jobs.py all         everything: first run, or local development
@@ -13,7 +13,7 @@ import sys, time
 from publish import publish, get_store, PRODUCTS
 
 JOBS = {
-    "hourly":   ("now", "lineup"),      # buoys report every 30-60 min
+    "hourly":   ("now", "lineup", "weather"),   # buoys report every 30-60 min; wind forecast hourly
     "forecast": ("forecast",),          # NOAA runs at 00/06/12/18 UTC, online ~5 h later
     "nightly":  ("map",),               # only changes when a spot's grids or tables are rebuilt
     "all":      PRODUCTS,

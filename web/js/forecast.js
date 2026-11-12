@@ -14,6 +14,40 @@ function sun(t,lat,lon){                                         // sunrise/suns
   const noon=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())/1000+(12-lon/15-eot/60)*3600;
   return[noon-w/15*3600,noon+w/15*3600];
 }
+// Wind, tide and rating under the forecast chart, on the same time axis (weather.json).
+const WX=()=>DATA.weather||null;
+const wxAt=(rows,t)=>{if(!rows||!rows.length)return null;let k=0;for(let i=1;i<rows.length;i++)if(Math.abs(rows[i][0]-t)<Math.abs(rows[k][0]-t))k=i;return Math.abs(rows[k][0]-t)<=5400?rows[k]:null};
+function drawWx(svg,W,pl,pr,X,t0,t1){
+  const w=WX(),key=document.getElementById("wx-key");
+  if(!w||(!w.wind&&!w.tide)){svg.style.display="none";if(key)key.hidden=true;return}
+  if(key)key.hidden=!w.wind;
+  document.getElementById("fc-sub").textContent="Surf height at the spot from NOAA's swell forecast run through this spot's model, with the wind, tide and an overall surf rating.";
+  const Hh=170;svg.style.display="block";svg.setAttribute("viewBox",`0 0 ${W} ${Hh}`);svg.setAttribute("height",Hh);svg.innerHTML="";
+  const inR=t=>t>=t0&&t<=t1,lab=(y,txt)=>{el("text",{x:pl,y,"font-size":11,"font-weight":600,fill:"var(--muted)"},svg).textContent=txt};
+  const dx=(W-pl-pr)/((t1-t0)/3600);
+  if(w.rating&&w.rating.length){                     // rating: one colored block per hour
+    lab(10,"Rating");
+    for(const [t,r] of w.rating)if(inR(t))el("rect",{x:X(t)-dx/2,y:15,width:dx+.5,height:10,fill:ratingColor(r)},svg);
+  }
+  if(w.wind){                                        // wind: arrows (the way it blows) colored by angle to the beach
+    lab(46,"Wind (kt)");const every=W<520?12:6;
+    for(const h of w.wind.hours){const [t,kt,,d,rel]=h;if(!inR(t)||Math.round(t/3600)%every)continue;
+      const g=el("g",{transform:`translate(${X(t)} 62)`},svg),c=windColor(rel,kt),sc=0.7+Math.min(kt,25)/25*0.6;
+      el("path",{d:"M0 -6.5L4.6 3.5L0 1.2L-4.6 3.5Z",fill:c,transform:`rotate(${(d+180)%360}) scale(${sc})`},g);
+      el("text",{y:21,"text-anchor":"middle","font-size":10,fill:"var(--muted)"},g).textContent=Math.round(kt)}
+  }
+  if(w.tide){                                        // tide: the curve, with highs and lows
+    const T=w.tide.hours.filter(h=>inR(h[0]));if(T.length>1){
+      lab(102,"Tide (ft)");
+      const lo=Math.min(...w.tide.events.map(e=>e[1]),0),hi=Math.max(...w.tide.events.map(e=>e[1])),y0=110,y1=162;
+      const Y=v=>y1-(v-lo)/(hi-lo||1)*(y1-y0);
+      el("path",{d:`M${X(T[0][0])} ${y1}`+T.map(h=>`L${X(h[0])} ${Y(h[1])}`).join("")+`L${X(T[T.length-1][0])} ${y1}Z`,fill:"var(--deep)",opacity:.16},svg);
+      el("path",{d:"M"+T.map(h=>`${X(h[0])} ${Y(h[1])}`).join("L"),fill:"none",stroke:"var(--deep)","stroke-width":1.5},svg);
+      if(W>=520)for(const [t,ft,k] of w.tide.events)if(inR(t)&&k==="H"&&X(t)>pl+56)
+        el("text",{x:X(t),y:Y(ft)-4,"text-anchor":"middle","font-size":9.5,fill:"var(--muted)"},svg).textContent=`${ft.toFixed(1)}`;
+    }
+  }
+}
 function forecastCard(){
   const F=DATA.forecast;if(!F||!F.hours.length)return;
   document.getElementById("fc").hidden=false;
@@ -30,10 +64,11 @@ function forecastCard(){
     const votes={};for(const h of use)if(h.sw[0])votes[h.sw[0][0]]=(votes[h.sw[0][0]]||0)+h.sw[0][1];
     d.sw=Object.entries(votes).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
     d.t0=d.hs[0].t;d.t1=d.hs[d.hs.length-1].t;
+    const rs=(WX()?.rating||[]).filter(r=>r[0]>=sr&&r[0]<=ss);d.rating=rs.length?Math.max(...rs.map(r=>r[1])):null;
   }
   const dEl=document.getElementById("fc-days");
   dEl.innerHTML=shown.map((d,i)=>`<button class="day" data-i="${i}" style="--sz:${sizeColor(sizeAvg(d.lo,d.hi))}"><div class="dn">${i===0&&dayKey(Date.now()/1000)===d.k?"Today":dfmt(d.t0,{weekday:"short"})}</div>
-    <div class="dh">${range(d.lo,d.hi)}<small> ft</small></div><div class="ds">${d.sw}</div></button>`).join("");
+    <div class="dh">${range(d.lo,d.hi)}<small> ft</small></div><div class="ds">${d.sw}</div>${d.rating!=null?`<div class="dr">${ratingDots(d.rating,6)}</div>`:""}</button>`).join("");
   // chart
   const svgF=document.getElementById("fc-svg"),tip=document.getElementById("fc-tip"),wrap=document.getElementById("fc-chart");
   let sel=null;
@@ -79,10 +114,14 @@ function forecastCard(){
       dot.setAttribute("cx",px);dot.setAttribute("cy",Y((h.lo+h.hi)/2));dot.setAttribute("opacity",1);
       tip.innerHTML=`<div class="tl">${dfmt(h.t,{weekday:"short",hour:"numeric"})}</div><b>${range(h.lo,h.hi)} ft</b> surf
         <div class="tl" style="margin-top:4px">Swell offshore ${fmt(h.off)} ft</div>`+
-        h.sw.map(s=>`<div>${s[0]}: ${fmt(s[2])} ft out → <b style="font-size:12px">${fmt(s[1])} ft</b> here</div>`).join("");
+        h.sw.map(s=>`<div>${s[0]}: ${fmt(s[2])} ft out → <b style="font-size:12px">${fmt(s[1])} ft</b> here</div>`).join("")+
+        (()=>{const w=WX();if(!w)return"";const wd=wxAt(w.wind?.hours,h.t),td=wxAt(w.tide?.hours,h.t),rt=wxAt(w.rating,h.t);
+          return(wd?`<div style="margin-top:4px">Wind <b style="font-size:12px">${Math.round(wd[1])} kt ${compassName(wd[3])}</b>, ${windWord(wd[4],wd[1])}</div>`:"")+
+            (td?`<div>Tide ${td[1].toFixed(1)} ft</div>`:"")+(rt?`<div style="margin-top:4px">${ratingDots(rt[1],7)} ${ratingWord(rt[1])}</div>`:"")})();
       tip.style.display="block";const tw=tip.offsetWidth;tip.style.left=Math.min(Math.max(px+12,0),W-tw)+"px";
       if(px+12+tw>W)tip.style.left=Math.max(px-12-tw,0)+"px";
     };
+    drawWx(document.getElementById("fc-wx"),W,pl,pr,X,t0,t1);
     svgF.onpointermove=e=>show(e.clientX);svgF.onpointerdown=e=>show(e.clientX);
     svgF.onpointerleave=()=>{tip.style.display="none";cur.setAttribute("opacity",0);dot.setAttribute("opacity",0)};
   }
@@ -90,6 +129,6 @@ function forecastCard(){
     dEl.querySelectorAll(".day").forEach((x,j)=>x.classList.toggle("on",j===sel));drawChart()};
   drawChart();addEventListener("resize",drawChart);
   const adj=Math.abs(F.gain-1)>=0.05?` The buoy was reading ${Math.round(Math.abs(F.gain-1)*100)}% ${F.gain>1?"bigger":"smaller"} than the forecast, so the first day has been scaled to match, with the correction fading out after that.`:"";
-  document.getElementById("fc-note").textContent=`NOAA WaveWatch III, run of ${dfmt(F.run,{weekday:"short",hour:"numeric",timeZoneName:"short"})}, at buoy ${F.point}.${adj} Swell only: wind and tide aren't included yet, and the farther out, the less certain.`;
+  document.getElementById("fc-note").textContent=`NOAA WaveWatch III, run of ${dfmt(F.run,{weekday:"short",hour:"numeric",timeZoneName:"short"})}, at buoy ${F.point}.${adj} ${WX()?.wind?" Wind: NOAA National Weather Service; tide: NOAA tide predictions. The rating combines size, period and wind (tide isn't in it yet).":" Swell only: wind and tide aren't available right now."} The farther out, the less certain.`;
 }
 forecastCard();

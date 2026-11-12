@@ -24,10 +24,11 @@ def load_forecast(region, spec, run=None):
         return None
 
 def region_inputs(region, when=None, with_forecast=True, run=None):
-    """dict(spec, parts, fc, coarse) for `region`: the latest buoy reading, or the one nearest
+    """dict(spec, parts, fc, coarse, live) for `region`: the latest buoy reading, or the one nearest
     `when` (aware UTC datetime; no forecast then, unless `run` names a cached one)."""
     stn = config.REGIONS[region]["input_buoy"]
     spec = nearest(stn, when) if when else latest(stn); spec["stn"] = stn
     print(f"{config.REGIONS[region]['name']}: buoy {stn} at {spec['time']:%Y-%m-%d %H:%M} UTC", flush=True)
     fc = load_forecast(region, spec, run) if with_forecast and (run or not when) else None
-    return dict(spec=spec, parts=swells(spec), fc=fc, coarse=Bathy.coarse(region))
+    # live: the latest reading, so today's wind and tide apply (not for replays of a past time)
+    return dict(spec=spec, parts=swells(spec), fc=fc, coarse=Bathy.coarse(region), live=when is None)

@@ -68,3 +68,39 @@ function wavesSVG() {
   return `<svg class="waves" viewBox="0 0 1600 70" preserveAspectRatio="none" aria-hidden="true">` +
     `<path class="w1" d="${wave(9, 34, 0)}"/><path class="w2" d="${wave(7, 44, 2)}"/><path class="w3" d="${wave(5, 54, 4)}"/></svg>`;
 }
+
+// Surf rating (0-5, from insights.py): color, word, and five dots.
+const RATING_WORDS = ["flat", "poor", "poor to fair", "fair", "good", "very good", "epic"];
+const ratingColor = r => r < 1 ? "#9fb0bd" : r < 2 ? "#e2774a" : r < 3 ? "#e3b03a" : r < 4 ? "#3fb56c" : r < 5 ? "#159a8c" : "#7a5bd6";
+const ratingWord = r => r < 0.5 ? RATING_WORDS[0] : RATING_WORDS[Math.min(6, 1 + Math.floor(r))];
+function ratingDots(r, size = 8) {
+  let s = "";
+  for (let k = 0; k < 5; k++) {
+    const f = Math.max(0, Math.min(1, r - k));                   // 0, 0.5 or 1 of this dot
+    s += `<i style="width:${size}px;height:${size}px;background:linear-gradient(90deg,var(--rc) ${f * 100}%,var(--dot-off) ${f * 100}%)"></i>`;
+  }
+  return `<span class="dots" style="--rc:${ratingColor(r)}" title="${r} of 5">${s}</span>`;
+}
+
+// Wind relative to the beach (insights.py wind_state "rel").
+const WIND_COLORS = {offshore: "#2c9f68", "cross-offshore": "#5bb46a", "cross-shore": "#d4a020", "cross-onshore": "#e07a3e", onshore: "#d6493f"};
+const windColor = (rel, kt) => kt < 4 ? "#2c9f68" : WIND_COLORS[rel] || "#888";
+const windWord = (rel, kt) => kt < 4 ? "glassy" : rel;
+
+function clockTime(t, tz = "America/Los_Angeles") {
+  return new Intl.DateTimeFormat("en-US", {timeZone: tz, hour: "numeric", minute: "2-digit"}).format(new Date(t * 1000)).replace(":00", "").toLowerCase().replace(" ", "");
+}
+
+// Best daytime (6 am - 6 pm local) value per local day from [[unix t, value], ...]: {dayKey: max}.
+const dayKeyOf = (t, tz = "America/Los_Angeles") =>
+  new Intl.DateTimeFormat("en-US", {timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date(t * 1000));
+function dailyBest(series, tz = "America/Los_Angeles") {
+  const out = {};
+  for (const [t, v] of series || []) {
+    const h = +new Intl.DateTimeFormat("en-US", {timeZone: tz, hour: "numeric", hourCycle: "h23"}).format(new Date(t * 1000));
+    if (h < 6 || h > 18) continue;
+    const k = dayKeyOf(t, tz);
+    out[k] = Math.max(out[k] ?? -1, v);
+  }
+  return out;
+}

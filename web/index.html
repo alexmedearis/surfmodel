@@ -28,12 +28,12 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 document.getElementById("hero").insertAdjacentHTML("afterbegin",wavesSVG());
 
 let TOP=10;                                          // shared bar scale (ft), so spots compare at a glance
-function spark(steps){                               // 7 bars, one per day: the daytime peak
-  const days=dailyPeaks(steps);if(!days.length)return"";
+function spark(steps,ratings){                       // 7 bars, one per day: the daytime peak (+ best rating dot)
+  const days=dailyPeaks(steps);if(!days.length)return"";const best=dailyBest(ratings);
   const top=TOP;
   const wd=t=>new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",weekday:"narrow"}).format(new Date(t*1000));
   return`<div class="spark" aria-label="Next ${days.length} days">${days.map(d=>{const a=sizeAvg(d.lo,d.hi);
-    return`<div class="b" title="${d.lo}–${d.hi} ft"><div class="spark-wrap"><div class="bar" style="height:${Math.max(8,a/top*100)}%;--c:${sizeColor(a)}"></div></div><span class="d">${wd(d.t)}</span></div>`}).join("")}</div>`;
+    return`<div class="b" title="${d.lo}–${d.hi} ft"><div class="spark-wrap"><div class="bar" style="height:${Math.max(8,a/top*100)}%;--c:${sizeColor(a)}"></div></div><span class="d">${wd(d.t)}</span>${best[dayKeyOf(d.t)]!=null?`<span class="rd" style="--rc:${ratingColor(best[dayKeyOf(d.t)])}" title="best ${ratingWord(best[dayKeyOf(d.t)])}"></span>`:""}</div>`}).join("")}</div>`;
 }
 function card(s,c){
   const lo=c?.surf_ft?.[0],hi=c?.surf_ft?.[1],has=c&&lo!=null;
@@ -41,11 +41,13 @@ function card(s,c){
   if(c?.main)tags.push(`<span class="tag">${c.dir!=null?swellArrow(c.dir,12):""}${esc(c.main)}</span>`);
   if(c?.peel)tags.push(`<span class="tag">${esc(PEEL_WORDS[c.peel.cls])} ${esc(c.peel.side)}s</span>`);
   else if(c?.favors)tags.push(`<span class="tag">${c.favors==="peaks"?"A-frames":"Favors "+esc(c.favors)}</span>`);
+  if(c?.wind)tags.push(`<span class="tag">${swellArrow(c.wind.dir,12,windColor(c.wind.rel,c.wind.kt))}${c.wind.kt} kt ${esc(windWord(c.wind.rel,c.wind.kt))}</span>`);
   if(c?.mix==="clean groundswell")tags.push(`<span class="tag">Clean groundswell</span>`);
   return`<a class="spot" href="spot.html?spot=${encodeURIComponent(s.slug)}" style="--sz:${has?sizeColor(sizeAvg(lo,hi)):"var(--line)"}">
     <div class="head"><div><div class="nm">${esc(s.name)}</div><div class="kind">${esc(KIND[s.break_type]||"")}</div></div>
     ${has?`<div><div class="ft">${lo}–${hi}<small>ft</small></div><div class="word">${sizeWord(lo,hi)}</div></div>`:""}</div>
-    ${tags.length?`<div class="tags">${tags.join("")}</div>`:""}${c?.forecast?spark(c.forecast):""}</a>`;
+    ${c?.rating&&c.rating.wind_known?`<div class="rt">${ratingDots(c.rating.score,9)}<span style="color:${ratingColor(c.rating.score)}">${esc(c.rating.word[0].toUpperCase()+c.rating.word.slice(1))}</span></div>`:""}
+    ${tags.length?`<div class="tags">${tags.join("")}</div>`:""}${c?.forecast?spark(c.forecast,c.ratings):""}</a>`;
 }
 Promise.all([getJSON(dataURL("spots/index.json")),getJSON(dataURL("spots/conditions.json"),true).catch(()=>null)]).then(([d,c])=>{
   const cond=Object.fromEntries((c?.spots||[]).map(x=>[x.slug,x]));
@@ -57,7 +59,7 @@ Promise.all([getJSON(dataURL("spots/index.json")),getJSON(dataURL("spots/conditi
   document.getElementById("list").innerHTML=Object.entries(regions).map(([r,ss])=>
     `<div class="region"><h2>${esc(r)}</h2></div><div class="grid">${ss.map(s=>card(s,cond[s.slug])).join("")}</div>`).join("")
     +`<div class="scale">${scale}</div>`
-    +(newest?`<p class="updated">Buoy readings from ${ago(newest)}. Bars: each day's daytime peak, from NOAA's swell forecast.</p>`:"");
+    +(newest?`<p class="updated">Buoy readings from ${ago(newest)}. Bars: each day's daytime peak surf height; dots: its best rating (size, period and wind).</p>`:"");
 }).catch(e=>{document.getElementById("list").innerHTML=`<p class="status">Couldn't load the spot list: ${esc(e.message)}.</p>`});
 </script>
 </body>

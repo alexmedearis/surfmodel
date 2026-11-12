@@ -7,8 +7,10 @@
   hero.insertAdjacentHTML("afterbegin", wavesSVG());
   const [lo, hi] = DATA.breakers;
   document.getElementById("size").innerHTML = `${lo}–${hi}<small>ft</small>`;
+  const R = DATA.insights && DATA.insights.rating;
   document.getElementById("sizeword").innerHTML =
-    `<span class="sizeword" style="--sz:${sizeColor(sizeAvg(lo, hi))}"><i></i>${sizeWord(lo, hi)}</span>`;
+    `<span class="sizeword" style="--sz:${sizeColor(sizeAvg(lo, hi))}"><i></i>${sizeWord(lo, hi)}</span>` +
+    (R && R.wind_known ? `<span class="rating">${ratingDots(R.score, 9)}<b>${R.word[0].toUpperCase() + R.word.slice(1)}</b></span>` : "");
 
   const KIND = {beach: "Beach break", reef: "Reef break", point: "Point break", jetty: "Jetty"};
   const kind = KIND[(DATA.facts || {}).break_type] || "";
@@ -17,6 +19,15 @@
 
   const fact = (label, html) => `<span class="fact"><span><span class="lbl">${label}</span>${html}</span></span>`;
   const out = [];
+  const I0 = DATA.insights || {};
+  if (I0.wind) {
+    const w = I0.wind;
+    out.push(fact("Wind", `<b>${w.kt} kt ${w.compass}</b> ${swellArrow(w.dir, 14, "#fff")} <span class="wtag" style="--wc:${windColor(w.rel, w.kt)}">${windWord(w.rel, w.kt)}</span>${w.gust_kt >= w.kt + 5 ? ` · gusts ${w.gust_kt}` : ""}`));
+  }
+  if (I0.tide) {
+    const t = I0.tide, nx = [t.next_high && ["high", t.next_high], t.next_low && ["low", t.next_low]].filter(Boolean).sort((a, b) => a[1].t - b[1].t)[0];
+    out.push(fact("Tide", `<b>${t.ft} ft ${t.rising ? "↑ rising" : "↓ falling"}</b>${nx ? ` · ${nx[0]} ${nx[1].ft} ft at ${clockTime(nx[1].t)}` : ""}`));
+  }
   const m = DATA.swells[DATA.main ?? -1];
   if (m) out.push(fact("Main swell", `<b>${m.tp}s ${compassName(m.dp)}</b> ${swellArrow(m.dp, 14, "#fff")} ${m.site_ft} ft here`));
   const I = DATA.insights;

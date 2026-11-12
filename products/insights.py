@@ -4,6 +4,8 @@ spot list, later the iPhone app) shows the same thing without redoing the reason
   spot_facts(tab)            what the spot is open to (its swell window); goes in map.json
   conditions(now, lineup)    what today's swells do there: main swell, angle, favors lefts or
                              rights, how it peels; goes in now.json as "insights"
+  wind_state, tide_state     the wind relative to the beach (offshore, onshore...) and the tide
+  rating(...)                one 0-5 surf rating from size, period and wind
 
 Plain facts and categories only; the wording stays with each client.
 """
@@ -126,3 +128,64 @@ def conditions(now, lineup=None, shore_normal=None):
     out["mix"] = ("clean groundswell" if s["tp"] >= 13 and share > 0.7 else
                   "mixed groundswell" if s["tp"] >= 13 else "short period")
     return out
+
+# ---------- wind, tide, rating ----------
+
+def wind_state(speed_kt, gust_kt, wind_from, shore_normal):
+    """The wind as surfers describe it. `shore_normal`: the direction the beach faces out to sea, so
+    wind from there blows straight onshore and wind from the opposite way straight offshore."""
+    a = abs(_rel(wind_from, shore_normal))          # 0 = straight onshore, 180 = straight offshore
+    rel = ("offshore" if a >= 135 else "cross-offshore" if a >= 100 else "cross-shore" if a >= 80
+           else "cross-onshore" if a >= 45 else "onshore")
+    strength = "calm" if speed_kt < 4 else "light" if speed_kt < 8 else "moderate" if speed_kt < 15 else "strong"
+    return dict(kt=round(speed_kt), gust_kt=round(gust_kt), dir=round(wind_from), compass=compass(wind_from),
+                rel=rel, strength=strength, glassy=bool(speed_kt < 4), score=round(wind_score(speed_kt, rel), 2))
+
+_WIND = {                    # how clean the surface stays: light, moderate, strong wind (1 = clean)
+    "offshore":       (1.0, 0.9, 0.6),           # strong offshore holds waves up and blows spray back
+    "cross-offshore": (0.95, 0.75, 0.45),
+    "cross-shore":    (0.8, 0.45, 0.2),
+    "cross-onshore":  (0.7, 0.25, 0.1),
+    "onshore":        (0.6, 0.15, 0.05),
+}
+
+def wind_score(speed_kt, rel):
+    if speed_kt < 4:
+        return 1.0                                   # glassy, whatever the direction
+    light, moderate, strong = _WIND[rel]
+    if speed_kt < 8:
+        return light
+    if speed_kt < 15:
+        return light + (moderate - light) * (speed_kt - 8) / 7
+    return max(0.0, strong - 0.03 * (speed_kt - 15))
+
+def tide_state(events, t, tide_at):
+    """Height now, rising or falling, and the next high and low. `events`: [[t, ft, "H"|"L"]]."""
+    h, h2 = (float(x) for x in tide_at(events, [t, t + 600]))
+    nxt = [e for e in events if e[0] > t]
+    out = dict(ft=round(h, 1), rising=bool(h2 > h))
+    for kind, key in (("H", "next_high"), ("L", "next_low")):
+        e = next((e for e in nxt if e[2] == kind), None)
+        if e:
+            out[key] = dict(t=e[0], ft=round(e[1], 1))
+    return out
+
+def size_score(face_ft):
+    """How much surf there is to ride, by typical face height (ft): 0 flat .. 1 plenty."""
+    pts = [(0, 0), (1, 0.05), (2, 0.3), (3, 0.55), (4, 0.75), (6, 0.95), (10, 1.0), (15, 0.95), (25, 0.85)]
+    return float(np.interp(face_ft, *zip(*pts)))
+
+def period_score(tp):
+    return float(np.interp(tp, [5, 8, 11, 14], [0.55, 0.75, 0.9, 1.0]))
+
+RATING_WORDS = ["flat", "poor", "poor to fair", "fair", "good", "very good", "epic"]
+
+def rating(lo_ft, hi_ft, tp, wind=None):
+    """One surf rating, 0-5 in half steps, from size, period and wind (no wind data: rated as light
+    cross-shore). Tide isn't in it yet: which tide a spot likes needs session reports to learn."""
+    size = size_score((lo_ft + hi_ft) / 2)
+    w = wind["score"] if wind else 0.8
+    r = 5 * size * (0.2 + 0.8 * w) * (0.7 + 0.3 * period_score(tp))
+    r = round(r * 2) / 2
+    word = RATING_WORDS[0] if size < 0.1 else RATING_WORDS[min(6, 1 + int(r // 1))] if r < 5 else RATING_WORDS[6]
+    return dict(score=r, word=word)
