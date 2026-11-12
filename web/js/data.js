@@ -68,6 +68,7 @@ async function loadSpot(slug) {
     dir_bins: m.dir_bins, shore_normal: m.shore_normal, breakers: n.breakers, calibration: n.calibration,
     hs_ft: n.hs_ft, main: n.main, views: m.views, swells: n.swells,
     forecast: pageFields(f), lineup,
+    insights: n.insights || null, facts: m.facts || null,     // website extras (insights.py)
     updated: {now: n.generated_at, buoy: n.buoy_time, forecast: f && f.generated_at},
   };
 }

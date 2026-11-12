@@ -32,7 +32,7 @@ function forecastCard(){
     d.t0=d.hs[0].t;d.t1=d.hs[d.hs.length-1].t;
   }
   const dEl=document.getElementById("fc-days");
-  dEl.innerHTML=shown.map((d,i)=>`<button class="day" data-i="${i}"><div class="dn">${i===0&&dayKey(Date.now()/1000)===d.k?"Today":dfmt(d.t0,{weekday:"short"})}</div>
+  dEl.innerHTML=shown.map((d,i)=>`<button class="day" data-i="${i}" style="--sz:${sizeColor(sizeAvg(d.lo,d.hi))}"><div class="dn">${i===0&&dayKey(Date.now()/1000)===d.k?"Today":dfmt(d.t0,{weekday:"short"})}</div>
     <div class="dh">${range(d.lo,d.hi)}<small> ft</small></div><div class="ds">${d.sw}</div></button>`).join("");
   // chart
   const svgF=document.getElementById("fc-svg"),tip=document.getElementById("fc-tip"),wrap=document.getElementById("fc-chart");
@@ -60,8 +60,15 @@ function forecastCard(){
     }
     if(sel!==null){const d=shown[sel];el("rect",{x:X(Math.max(d.t0,t0)),y:pt,width:X(Math.min(d.t1,t1))-X(Math.max(d.t0,t0)),height:Hh-pt-pb,fill:"var(--deep)",opacity:.08},svgF)}
     const band=H.map(h=>[X(h.t),Y(h.hi)]).concat(H.map(h=>[X(h.t),Y(h.lo)]).reverse());
-    el("path",{d:"M"+band.map(p=>p.join(" ")).join("L")+"Z",fill:"var(--deep)",opacity:.28},svgF);
-    el("path",{d:"M"+H.map(h=>`${X(h.t)} ${Y((h.lo+h.hi)/2)}`).join("L"),fill:"none",stroke:"var(--deep)","stroke-width":2,"stroke-linejoin":"round"},svgF);
+    // colored by size: a vertical gradient with the size scale's colors at their heights
+    const sizeGrad=typeof SIZE_SCALE==="undefined"?null:(()=>{
+      const g=el("linearGradient",{id:"fc-size",gradientUnits:"userSpaceOnUse",x1:0,x2:0,y1:Y(0),y2:Y(top)},el("defs",{},svgF));
+      let lo=0;for(const [max,col] of SIZE_SCALE){
+        for(const v of [lo,Math.min(max,top)]){if(v<=top)el("stop",{offset:Math.min(1,v/top),"stop-color":col},g)}
+        lo=max;if(lo>=top)break}
+      return"url(#fc-size)"})();
+    el("path",{d:"M"+band.map(p=>p.join(" ")).join("L")+"Z",fill:sizeGrad||"var(--deep)",opacity:sizeGrad?.32:.28},svgF);
+    el("path",{d:"M"+H.map(h=>`${X(h.t)} ${Y((h.lo+h.hi)/2)}`).join("L"),fill:"none",stroke:sizeGrad||"var(--deep)","stroke-width":2.5,"stroke-linejoin":"round"},svgF);
     el("path",{d:"M"+H.map(h=>`${X(h.t)} ${Y(h.off)}`).join("L"),fill:"none",stroke:"var(--muted)","stroke-width":1.5,"stroke-dasharray":"4 3"},svgF);
     const cur=el("line",{y1:pt,y2:Hh-pb,stroke:"var(--text)","stroke-width":1,opacity:0},svgF);
     const dot=el("circle",{r:4,fill:"var(--deep)",stroke:"var(--card)","stroke-width":2,opacity:0},svgF);

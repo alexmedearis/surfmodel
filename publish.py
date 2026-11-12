@@ -184,7 +184,8 @@ def publish_index(store):
 
 def publish_conditions(store, slugs=None):
     """conditions.json: each spot's surf height and key facts from its published now.json, so the
-    spot list needs one small file instead of every spot's data. Returns how many spots."""
+    spot list needs one small file instead of every spot's data. Includes the forecast as
+    [unix time, low, high] surf height, for the list's 7-day mini chart. Returns how many spots."""
     rows = []
     for s in config.load_spots(kind="spot"):
         try:
@@ -194,10 +195,15 @@ def publish_conditions(store, slugs=None):
         ins = n.get("insights") or {}
         main = ins.get("main_swell") or {}
         peel = ins.get("peel") or {}
+        try:
+            fc = json.loads(store.get(spot_path(s["slug"], "forecast.json")))
+            fc = [[h["t"], round(h["lo"]), round(h["hi"])] for h in fc["hours"]]
+        except FileNotFoundError:
+            fc = []
         rows.append(dict(slug=s["slug"], surf_ft=n["breakers"], hs_ft=n["hs_ft"], main=main.get("short"),
-                         period=main.get("period"), favors=ins.get("favors"), mix=ins.get("mix"),
+                         period=main.get("period"), dir=main.get("dir"), favors=ins.get("favors"), mix=ins.get("mix"),
                          peel=dict(side=peel["side"], cls=peel["cls"]) if peel.get("cls") else None,
-                         buoy_time=n.get("buoy_time"), updated=n.get("generated_at")))
+                         buoy_time=n.get("buoy_time"), updated=n.get("generated_at"), forecast=fc))
     store.put(f"{API}/spots/conditions.json", _json(dict(schema_version=1, spots=rows)),
               cache_seconds=CACHE_SECONDS["conditions"])
     return len(rows)
@@ -244,7 +250,7 @@ def publish(store, only=PRODUCTS, slugs=None, when=None):
                 print(f"  FAILED: {e!r}", flush=True)
                 failed.append(tab["slug"])
     print(f"index: {publish_index(store)} spots", flush=True)
-    if "now" in only:
+    if "now" in only or "forecast" in only:
         print(f"conditions: {publish_conditions(store)} spots", flush=True)
     return failed
 
