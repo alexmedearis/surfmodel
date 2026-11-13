@@ -51,10 +51,9 @@ function dailyPeaks(steps, tz = "America/Los_Angeles", days = 7) {
     const h = hour(t);
     if (h >= 6 && h <= 18) d.day.push([lo, hi]);
   }
-  return out.filter(d => d.all.length >= 2).slice(0, days).map(d => {
-    const use = d.day.length ? d.day : d.all;
-    return {t: d.t, lo: Math.max(...use.map(x => x[0])), hi: Math.max(...use.map(x => x[1]))};
-  });
+  // a day with no daylight left (tonight) or none forecast yet isn't worth a bar
+  return out.filter(d => d.day.length).slice(0, days).map(d =>
+    ({t: d.t, lo: Math.max(...d.day.map(x => x[0])), hi: Math.max(...d.day.map(x => x[1]))}));
 }
 
 // Three layers of slow-moving waves for the bottom of a hero banner (each path repeats every 400 units,

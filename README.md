@@ -51,7 +51,8 @@ The same code and Docker image run in four places; `deploy/<env>.env` holds each
   A separate staging project (`deploy/staging.env`, `ENV=staging`) gets added with accounts and payments,
   when a mistake could affect paying customers.
 - The jobs: `surf-hourly` (:10 past each hour), `surf-forecast` (05:40, 11:40, 17:40, 23:40 UTC),
-  `surf-nightly` (10:20 UTC), each 2 CPU / 2 GB (a full run peaks around 0.7 GB and takes ~1.5 min).
+  `surf-nightly` (10:20 UTC), each 4 CPU / 4 GB. Spots are published in parallel (`SURF_WORKERS` at a time,
+  ~0.5 GB each); 31 spots take ~2 min on 8 cores.
 - Data is public-read under `v1/` (`firebase/storage.rules`); that's where paid access gets enforced later.
 - The forecast log still runs as a GitHub Action (`.github/workflows/forecast-log.yml`).
 

@@ -40,8 +40,8 @@ docker buildx build --platform linux/amd64 -t "$IMAGE" --push .   # Cloud Run ru
 for JOB in hourly forecast nightly; do
   echo "== job surf-$JOB"
   $G run jobs deploy "surf-$JOB" --region="$REGION" --image="$IMAGE" --args="$JOB" \
-     --service-account="$JOBS_SA" --set-env-vars="SURF_STORE=gs://$BUCKET" \
-     --cpu=2 --memory=2Gi --task-timeout=30m --max-retries=1
+     --service-account="$JOBS_SA" --set-env-vars="SURF_STORE=gs://$BUCKET,SURF_WORKERS=4" \
+     --cpu=4 --memory=4Gi --task-timeout=30m --max-retries=1
   URI="https://run.googleapis.com/v2/projects/$PROJECT/locations/$REGION/jobs/surf-$JOB:run"
   VERB=create
   $G scheduler jobs describe "surf-$JOB" --location="$REGION" >/dev/null 2>&1 && VERB=update

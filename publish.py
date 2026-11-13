@@ -20,7 +20,8 @@ lineup.json each one is {"bin": {"offset", "length", "dtype"}} pointing into it 
 Storage is behind a small interface (put/get) so the same code writes to a local folder now and
 to Google Cloud Storage when deployed; pick it with --store or the SURF_STORE setting.
 """
-import datetime as dt, json, os, sys
+import contextlib, datetime as dt, io, json, os, sys
+from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import config
 from common import Bathy
@@ -45,6 +46,7 @@ class LocalStore:
     """A folder on disk. Writes are atomic (temp file + rename), so a reader never sees half a file."""
     def __init__(self, root):
         self.root = os.path.abspath(root)
+        self.spec = "local:" + self.root
     def put(self, path, data, content_type="application/json", cache_seconds=300):
         full = os.path.join(self.root, path)
         os.makedirs(os.path.dirname(full), exist_ok=True)
@@ -68,6 +70,7 @@ class CloudStore:
         from google.cloud import storage                 # only needed when publishing to the cloud
         bucket, _, prefix = url[len("gs://"):].partition("/")
         self.url, self.prefix = url.rstrip("/"), prefix.strip("/")
+        self.spec = self.url
         emulator = os.environ.get("STORAGE_EMULATOR_HOST")
         if emulator:
             from google.auth.credentials import AnonymousCredentials
@@ -259,12 +262,38 @@ def load_spot(store, slug):
     out["lineup"] = lu if lu and lu.get("swells") else None
     return out
 
+# Spots are published in parallel worker processes, each set up once per region with that region's
+# inputs (the buoy reading, its swells, the forecast) so every spot uses exactly the same ones.
+_W = {}
+
+def _worker_init(store_spec, I, region):
+    _W.update(store=get_store(store_spec), I=dict(I, coarse=Bathy.coarse(region)))
+
+def _worker_spot(tab, only):
+    """Publish one spot in a worker; returns (slug, ok, log text)."""
+    buf = io.StringIO()
+    ok = True
+    with contextlib.redirect_stdout(buf):
+        print(tab["name"])
+        try:
+            sizes = publish_spot(_W["store"], tab, _W["I"], only)
+            print("  wrote " + ", ".join(f"{k} {v / 1e3:.0f} KB" for k, v in sizes.items()))
+        except Exception as e:
+            print(f"  FAILED: {e!r}")
+            ok = False
+    return tab["slug"], ok, buf.getvalue()
+
+def workers():
+    """How many spots to publish at once: SURF_WORKERS, else the CPU count (at most 8; each worker
+    needs ~0.5 GB of memory)."""
+    return int(os.environ.get("SURF_WORKERS") or min(os.cpu_count() or 1, 8))
+
 def publish(store, only=PRODUCTS, slugs=None, when=None):
     """Publish `only` for the given spots (default all), then the index and conditions files.
     A spot that fails is reported and skipped, so one bad spot doesn't stop the rest.
     Returns the slugs that failed."""
     spots = [s for s in config.load_spots(kind="spot") if not slugs or s["slug"] in slugs]
-    print(f"publishing {', '.join(only)} to {store}", flush=True)
+    print(f"publishing {', '.join(only)} to {store} ({workers()} at a time)", flush=True)
     failed = []
     for region in dict.fromkeys(s["region"] for s in spots):
         tabs = [t for t in load_tables(region) if t["slug"] in {s["slug"] for s in spots}]
@@ -276,14 +305,25 @@ def publish(store, only=PRODUCTS, slugs=None, when=None):
             print(f"  {region}: couldn't get the inputs: {e!r}", flush=True)
             failed += [t["slug"] for t in tabs]
             continue
-        for tab in tabs:
-            print(tab["name"], flush=True)
-            try:
-                sizes = publish_spot(store, tab, I, only)
-                print("  wrote " + ", ".join(f"{k} {v / 1e3:.0f} KB" for k, v in sizes.items()), flush=True)
-            except Exception as e:
-                print(f"  FAILED: {e!r}", flush=True)
-                failed.append(tab["slug"])
+        n = min(workers(), len(tabs))
+        if n <= 1:
+            _worker_init(store.spec, {k: v for k, v in I.items() if k != "coarse"}, region)
+            results = (_worker_spot(t, only) for t in tabs)
+        else:
+            pool = ProcessPoolExecutor(n, initializer=_worker_init,
+                                       initargs=(store.spec, {k: v for k, v in I.items() if k != "coarse"}, region))
+            results = pool.map(_worker_spot, tabs, [only] * len(tabs))
+        try:
+            for slug, ok, log in results:
+                print(log, end="", flush=True)
+                if not ok:
+                    failed.append(slug)
+        except Exception as e:                       # a worker died (e.g. out of memory)
+            print(f"  {region}: worker failed: {e!r}", flush=True)
+            failed += [t["slug"] for t in tabs if t["slug"] not in failed]
+        finally:
+            if n > 1:
+                pool.shutdown()
     print(f"index: {publish_index(store)} spots", flush=True)
     if {"now", "forecast", "weather"} & set(only):
         print(f"conditions: {publish_conditions(store)} spots", flush=True)

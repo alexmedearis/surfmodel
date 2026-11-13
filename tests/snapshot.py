@@ -1,8 +1,8 @@
 """Regression check for the page data: build every spot from fixed inputs (a fixed buoy time
 and a cached WaveWatch III run) and save or compare the result.
 
-  python tests/snapshot.py save  <dir>     record
-  python tests/snapshot.py check <dir>     rebuild and compare exactly with the recording
+  python tests/snapshot.py save  <dir> [slug ...]   record (all spots, or add these to the recording)
+  python tests/snapshot.py check <dir>     rebuild the recorded spots and compare exactly
   python tests/snapshot.py check-published <dir> <tmp>   same, but via the published data files
 
 Used to make sure refactors don't change what the model publishes. The inputs still come from
@@ -16,7 +16,7 @@ from predict import load_tables
 WHEN = dt.datetime(2026, 11, 9, 18, 0, tzinfo=dt.timezone.utc)
 RUN = ("20261109", "12")
 
-def build_all(published_to=None):
+def build_all(published_to=None, slugs=None):
     """Page data for every spot from the fixed inputs. With `published_to` (a folder), go the
     long way: publish the data files there, read them back, and assemble the page from those,
     which checks the whole publish/read path too."""
@@ -28,6 +28,8 @@ def build_all(published_to=None):
     for region in ("bayarea", "santacruz"):
         I = region_inputs(region, WHEN, run=RUN)
         for tab in load_tables(region):
+            if slugs is not None and tab["slug"] not in slugs:
+                continue
             print(tab["name"], flush=True)
             if store:
                 publish.publish_spot(store, tab, I)
@@ -59,13 +61,16 @@ def diff(a, b, path=""):
 
 if __name__ == "__main__":
     mode, d = sys.argv[1], sys.argv[2]
-    data = build_all(sys.argv[3] if mode == "check-published" else None)
-    os.makedirs(d, exist_ok=True)
     if mode == "save":
+        slugs = set(sys.argv[3:]) or None
+        data = build_all(None, slugs)
+        os.makedirs(d, exist_ok=True)
         for slug, v in data.items():
             json.dump(v, open(os.path.join(d, f"{slug}.json"), "w"), separators=(",", ":"))
         print(f"saved {len(data)} spots to {d}")
     else:
+        recorded = {f[:-5] for f in os.listdir(d) if f.endswith(".json")}
+        data = build_all(sys.argv[3] if mode == "check-published" else None, recorded)
         bad = 0
         for slug, v in data.items():
             ref = json.load(open(os.path.join(d, f"{slug}.json")))
@@ -74,4 +79,7 @@ if __name__ == "__main__":
             for line in dd[:10]:
                 print("   ", line)
             bad += bool(dd)
-        sys.exit(1 if bad else 0)
+        missing = recorded - set(data)
+        if missing:
+            print("recorded but no longer built:", ", ".join(sorted(missing)))
+        sys.exit(1 if bad or missing else 0)
