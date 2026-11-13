@@ -202,12 +202,14 @@ def publish_spot(store, tab, I, only=PRODUCTS):
     return sizes
 
 def publish_index(store):
+    """index.json: every spot with a table, with its area, in spots.csv order: along the coast,
+    north to south (and around bays), which is how the spot list shows them."""
     spots = []
     for s in config.load_spots(kind="spot"):
         if os.path.exists(config.table_path(s["slug"])):
             spots.append(dict(slug=s["slug"], name=s["name"], region=s["region"],
-                              region_name=config.REGIONS[s["region"]]["name"], lat=s["lat"], lon=s["lon"],
-                              break_type=config.break_type(s["slug"])))
+                              region_name=config.REGIONS[s["region"]]["name"], area=s.get("area") or "",
+                              lat=s["lat"], lon=s["lon"], break_type=config.break_type(s["slug"])))
     store.put(f"{API}/spots/index.json", _json(dict(schema_version=1, spots=spots)),
               cache_seconds=CACHE_SECONDS["index"])
     return len(spots)

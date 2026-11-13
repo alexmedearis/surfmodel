@@ -57,7 +57,7 @@ The same code and Docker image run in four places; `deploy/<env>.env` holds each
 - The forecast log still runs as a GitHub Action (`.github/workflows/forecast-log.yml`).
 
 ## Adding spots and regions
-- **Spot in an existing region:** add a row to `spots.csv` (`kind=spot`, `depth` = model point depth,
+- **Spot in an existing region:** add a row to `spots.csv` in its place along the coast (the spot list follows the row order) (`kind=spot`, `depth` = model point depth,
   10 m by default, `tide` = the nearest open-coast NOAA tide station), then `fetch_bathy.py fine <slug>` and
   `build_tables.py <slug>`.
 - **Check buoy:** a row with `kind=buoy` and the CDIP `station`; `validate.py` compares it with the model.

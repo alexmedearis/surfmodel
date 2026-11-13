@@ -11,7 +11,7 @@
 </head>
 <body>
 <!--WEB-->
-<nav class="site"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="#0b5d7e"/><path d="M4 16c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M4 11c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#7fe0d9" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></svg>Surf model</a><a class="crumb" href="./">All spots</a></nav>
+<nav class="site"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="#0b5d7e"/><path d="M4 16c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M4 11c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#7fe0d9" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></svg>Surf model</a><span class="crumbs"><a class="crumb" href="./">All spots</a></span></nav>
 <p class="status" id="status">Loading…</p>
 <!--/WEB-->
 <main hidden>
@@ -77,11 +77,12 @@
   <p class="note" id="lineup-note">Simplified: a straight beach on a smooth, sloping bottom. The angle and mix of swells come from the model;
     where exactly it peaks depends on sandbars and reef, which it doesn't know. Turn swells off to see what each one adds.</p>
 </div>
+<div class="card nearby-card" id="nearby" hidden></div>
 </main>
 <!--APP-->
 <script src="config.js"></script>
 <script src="js/data.js"></script>
-<script>bootSpot(["js/surf.js","js/common.js","js/map.js","js/hero.js","js/forecast.js","js/lineup.js"])</script>
+<script>bootSpot(["js/surf.js","js/common.js","js/map.js","js/hero.js","js/forecast.js","js/lineup.js","js/nearby.js"])</script>
 <!--/APP-->
 </body>
 </html>

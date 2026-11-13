@@ -12,55 +12,37 @@
 <body>
 <nav class="site"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="#0b5d7e"/><path d="M4 16c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M4 11c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#7fe0d9" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></svg>Surf model</a></nav>
 <main>
-<header class="hero home-hero" id="hero">
+<header class="hero home-hero compact" id="hero">
   <div class="kicker">California surf</div>
   <h1>Where's it breaking?</h1>
   <p>Surf height, how each swell wraps in, and a 7-day forecast, from a wave model of every spot's real seafloor.</p>
 </header>
+<div class="toolbar" id="toolbar">
+  <div class="search">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input id="q" type="search" placeholder="Search spots, areas…" aria-label="Search spots" autocomplete="off" spellcheck="false">
+    <button id="qclear" class="qclear" aria-label="Clear search" hidden>×</button>
+    <kbd>/</kbd>
+  </div>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Sort">
+      <button data-sort="geo">North to south</button><button data-sort="best">Best now</button><button data-sort="size">Biggest</button>
+    </div>
+    <select id="area" aria-label="Area"></select>
+    <div class="chips" id="breaks" role="group" aria-label="Break type"></div>
+    <button class="chip good" id="good" aria-pressed="false">Good now</button>
+    <span class="count" id="count"></span>
+    <div class="seg views" role="group" aria-label="View">
+      <button data-view="cards" aria-label="Cards" title="Cards"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg></button><button data-view="list" aria-label="List" title="List"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14" height="2.4" rx="1.2"/><rect x="1" y="6.8" width="14" height="2.4" rx="1.2"/><rect x="1" y="11.6" width="14" height="2.4" rx="1.2"/></svg></button>
+    </div>
+  </div>
+</div>
 <div id="list"><p class="status">Loading…</p></div>
+<div id="foot"></div>
 </main>
 <script src="config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/surf.js"></script>
-<script>
-const KIND={beach:"Beach break",reef:"Reef break",point:"Point break",jetty:"Jetty"};
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-document.getElementById("hero").insertAdjacentHTML("afterbegin",wavesSVG());
-
-let TOP=10;                                          // shared bar scale (ft), so spots compare at a glance
-function spark(steps,ratings){                       // 7 bars, one per day: the daytime peak (+ best rating dot)
-  const days=dailyPeaks(steps);if(!days.length)return"";const best=dailyBest(ratings);
-  const top=TOP;
-  const wd=t=>new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",weekday:"narrow"}).format(new Date(t*1000));
-  return`<div class="spark" aria-label="Next ${days.length} days">${days.map(d=>{const a=sizeAvg(d.lo,d.hi);
-    return`<div class="b" title="${d.lo}–${d.hi} ft"><div class="spark-wrap"><div class="bar" style="height:${Math.max(8,a/top*100)}%;--c:${sizeColor(a)}"></div></div><span class="d">${wd(d.t)}</span>${best[dayKeyOf(d.t)]!=null?`<span class="rd" style="--rc:${ratingColor(best[dayKeyOf(d.t)])}" title="best ${ratingWord(best[dayKeyOf(d.t)])}"></span>`:""}</div>`}).join("")}</div>`;
-}
-function card(s,c){
-  const lo=c?.surf_ft?.[0],hi=c?.surf_ft?.[1],has=c&&lo!=null;
-  const tags=[];
-  if(c?.main)tags.push(`<span class="tag">${c.dir!=null?swellArrow(c.dir,12):""}${esc(c.main)}</span>`);
-  if(c?.peel)tags.push(`<span class="tag">${esc(PEEL_WORDS[c.peel.cls])} ${esc(c.peel.side)}s</span>`);
-  else if(c?.favors)tags.push(`<span class="tag">${c.favors==="peaks"?"A-frames":"Favors "+esc(c.favors)}</span>`);
-  if(c?.wind)tags.push(`<span class="tag">${swellArrow(c.wind.dir,12,windColor(c.wind.rel,c.wind.kt))}${c.wind.kt} kt ${esc(windWord(c.wind.rel,c.wind.kt))}</span>`);
-  if(c?.mix==="clean groundswell")tags.push(`<span class="tag">Clean groundswell</span>`);
-  return`<a class="spot" href="spot.html?spot=${encodeURIComponent(s.slug)}" style="--sz:${has?sizeColor(sizeAvg(lo,hi)):"var(--line)"}">
-    <div class="head"><div><div class="nm">${esc(s.name)}</div><div class="kind">${esc(KIND[s.break_type]||"")}</div></div>
-    ${has?`<div><div class="ft">${lo}–${hi}<small>ft</small></div><div class="word">${sizeWord(lo,hi)}</div></div>`:""}</div>
-    ${c?.rating&&c.rating.wind_known?`<div class="rt">${ratingDots(c.rating.score,9)}<span style="color:${ratingColor(c.rating.score)}">${esc(c.rating.word[0].toUpperCase()+c.rating.word.slice(1))}</span></div>`:""}
-    ${tags.length?`<div class="tags">${tags.join("")}</div>`:""}${c?.forecast?spark(c.forecast,c.ratings):""}</a>`;
-}
-Promise.all([getJSON(dataURL("spots/index.json")),getJSON(dataURL("spots/conditions.json"),true).catch(()=>null)]).then(([d,c])=>{
-  const cond=Object.fromEntries((c?.spots||[]).map(x=>[x.slug,x]));
-  const regions={};
-  for(const s of d.spots)(regions[s.region_name]??=[]).push(s);
-  TOP=Math.max(10,...(c?.spots||[]).flatMap(x=>dailyPeaks(x.forecast||[]).map(d=>sizeAvg(d.lo,d.hi))));
-  const newest=(c?.spots||[]).map(x=>x.buoy_time).filter(Boolean).sort().pop();
-  const scale=SIZE_SCALE.map(([max,col,w],i)=>`<span style="--c:${col}"><i></i>${i?SIZE_SCALE[i-1][0]:0}${max===Infinity?"+":"–"+max} ft</span>`).join("");
-  document.getElementById("list").innerHTML=Object.entries(regions).map(([r,ss])=>
-    `<div class="region"><h2>${esc(r)}</h2></div><div class="grid">${ss.map(s=>card(s,cond[s.slug])).join("")}</div>`).join("")
-    +`<div class="scale">${scale}</div>`
-    +(newest?`<p class="updated">Buoy readings from ${ago(newest)}. Bars: each day's daytime peak surf height; dots: its best rating (size, period and wind).</p>`:"");
-}).catch(e=>{document.getElementById("list").innerHTML=`<p class="status">Couldn't load the spot list: ${esc(e.message)}.</p>`});
-</script>
+<script src="js/home.js"></script>
 </body>
 </html>

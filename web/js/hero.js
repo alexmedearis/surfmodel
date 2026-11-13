@@ -15,7 +15,7 @@
   const KIND = {beach: "Beach break", reef: "Reef break", point: "Point break", jetty: "Jetty"};
   const kind = KIND[(DATA.facts || {}).break_type] || "";
   const when = DATA.updated && DATA.updated.buoy ? `Buoy reading ${ago(DATA.updated.buoy)}` : "";
-  document.getElementById("kicker").textContent = [kind, when].filter(Boolean).join(" · ");
+  document.getElementById("kicker").textContent = [DATA.area, kind, when].filter(Boolean).join(" · ");
 
   const fact = (label, html) => `<span class="fact"><span><span class="lbl">${label}</span>${html}</span></span>`;
   const out = [];
