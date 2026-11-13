@@ -1,12 +1,28 @@
 """Live directional wave spectra from CDIP buoys (e.g. "029", Point Reyes) or NOAA NDBC buoys
 ("ndbc:46042", Monterey), and reconstruction of S(f, θ) with the Maximum Entropy Method
 (Lygre & Krogstad 1986). Both give the same dict: time, hs, tp, dp, f, df, E, a1, b1, a2, b2."""
-import re, datetime as dt, numpy as np, requests
+import re, time, datetime as dt, numpy as np, requests
 
 BASE = "https://thredds.cdip.ucsd.edu/thredds/dodsC/cdip/realtime/{stn}p1_rt.nc"
 
+def _fetch(url, expect, tries=4):
+    """GET a buoy server page, retrying: CDIP's and NDBC's servers sometimes answer with an error
+    page or time out for a minute. `expect`: text that a good answer contains."""
+    err = None
+    for k in range(tries):
+        try:
+            r = requests.get(url, timeout=60)
+            if r.status_code == 200 and expect in r.text:
+                return r.text
+            err = f"HTTP {r.status_code}: {r.text[:120]!r}"
+        except requests.RequestException as e:
+            err = repr(e)
+        if k < tries - 1:
+            time.sleep(5 * (k + 1))
+    raise RuntimeError(f"buoy data unavailable ({url}): {err}")
+
 def _ascii(url, q):
-    t = requests.get(url + ".ascii?" + q, timeout=60).text.split("---------------------------------------------", 1)[1]
+    t = _fetch(url + ".ascii?" + q, "---------------------------------------------").split("---------------------------------------------", 1)[1]
     out = {}
     for block in re.split(r"\n\s*\n", t.strip()):
         lines = block.strip().splitlines()
@@ -22,7 +38,7 @@ NDBC = "https://www.ndbc.noaa.gov/data/realtime2/{stn}.{ext}"
 def _ndbc_file(stn, ext):
     """Rows of an NDBC realtime2 spectral file: (time, values, freqs). Missing values (999) -> nan."""
     rows = []
-    for line in requests.get(NDBC.format(stn=stn, ext=ext), timeout=60).text.splitlines():
+    for line in _fetch(NDBC.format(stn=stn, ext=ext), "#YY").splitlines():
         if not line.strip() or line.startswith("#"):
             continue
         parts = line.split()
@@ -70,7 +86,7 @@ def latest(stn="029", back=0):
         times, by_time = _ndbc_all(stn[5:])
         return _ndbc_spec(times[back], by_time)                          # NDBC files are newest first
     url = BASE.format(stn=stn)
-    dds = requests.get(url + ".dds", timeout=60).text
+    dds = _fetch(url + ".dds", "waveTime[waveTime = ")
     n = int(re.search(r"waveTime\[waveTime = (\d+)\]", dds).group(1))
     nf = int(re.search(r"waveFrequency\[waveFrequency = (\d+)\]", dds).group(1))
     i = n - 1 - back
@@ -94,7 +110,7 @@ def history(stn="029", days=30):
         return dict(time=np.array([x["time"].timestamp() for x in specs]), f=specs[-1]["f"], df=specs[-1]["df"],
                     **{k: np.array([x[k] for x in specs]) for k in ("hs", "tp", "dp", "E", "a1", "b1", "a2", "b2")})
     url = BASE.format(stn=stn)
-    dds = requests.get(url + ".dds", timeout=60).text
+    dds = _fetch(url + ".dds", "waveTime[waveTime = ")
     n = int(re.search(r"waveTime\[waveTime = (\d+)\]", dds).group(1))
     nf = int(re.search(r"waveFrequency\[waveFrequency = (\d+)\]", dds).group(1))
     t = _ascii(url, "waveTime")["waveTime"]

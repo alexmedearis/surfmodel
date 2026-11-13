@@ -113,7 +113,11 @@ def main():
     for region in regions:
         R = config.REGIONS[region]
         stations += [R["input_buoy"]] + [t["station"] for t in load_tables(region, kind="buoy")]
-        hist = buoy.history(R["input_buoy"], 3)
+        try:
+            hist = buoy.history(R["input_buoy"], 3)
+        except Exception as e:                            # buoy server down: the runs stay online ~2 days,
+            print(f"{region}: skipped this time ({e})")   # so the next run (in 6 h) logs them
+            continue
         for d, c in reversed(runs):                       # oldest first
             t0 = dt.datetime.strptime(d + c, "%Y%m%d%H").replace(tzinfo=dt.timezone.utc)
             if (iso(t0), region) in done:
