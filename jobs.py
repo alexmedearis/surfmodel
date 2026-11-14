@@ -3,7 +3,7 @@ in the Docker image, and (later) as a Cloud Run Job on a schedule.
 
   python jobs.py hourly      current swells, surf height, lineup, wind, tide, rating     (every hour)
   python jobs.py forecast    7-day forecast from the newest WaveWatch III run            (every 6 hours)
-  python jobs.py nightly     maps and the spot index                                     (once a day)
+  python jobs.py nightly     spot maps, overview map, spot index                         (once a day)
   python jobs.py all         everything: first run, or local development
 
 Where it writes: --store, else the SURF_STORE setting, else out/data (see publish.py).

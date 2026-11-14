@@ -296,3 +296,23 @@ h3.area span{font-size:11px;font-weight:600;background:var(--chip);border-radius
   .crumbs{overflow:hidden}
   .crumbs .crumb{overflow:hidden;text-overflow:ellipsis}
 }
+/* ---------- spot list map view ---------- */
+.ovmap{position:relative;height:min(72vh,680px);min-height:380px;margin-top:16px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--chip);box-shadow:var(--shadow)}
+.ov-svg{display:block;width:100%;height:100%;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.ov-svg.grabbing{cursor:grabbing}
+.ov-mk{cursor:pointer;outline:none}
+.ov-label{pointer-events:none}
+.ov-zoom{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.ov-zoom button{width:36px;height:36px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--text);font:600 18px/1 inherit;cursor:pointer;display:grid;place-items:center;box-shadow:0 2px 8px rgba(15,34,49,.16)}
+.ov-card{position:absolute;left:12px;right:12px;bottom:12px;max-width:420px;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:0 12px 32px -10px rgba(15,34,49,.45)}
+.ov-x{position:absolute;right:8px;top:6px;width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--muted);font-size:20px;cursor:pointer}
+.ov-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding-right:22px}
+.ov-head b{display:block;font:600 18px/1.2 var(--display)}
+.ov-head small{font-size:12px;color:var(--muted)}
+.ov-ft{font:600 28px/1 var(--display);white-space:nowrap}
+.ov-ft small{font-size:12px;color:var(--muted);margin-left:2px}
+.ov-meta{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:12.5px;color:var(--muted);align-items:center}
+.ov-meta span{display:inline-flex;align-items:center;gap:5px}
+.ov-open{display:inline-block;margin-top:12px;padding:8px 14px;border-radius:10px;background:var(--accent);color:#fff;font-weight:600;font-size:13px;text-decoration:none}
+.maplegend{margin:10px 4px 0}
+@media (max-width:560px){.ovmap{height:66vh;margin-top:12px;border-radius:16px}.ov-card{left:8px;right:8px;bottom:8px}}

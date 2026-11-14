@@ -33,16 +33,19 @@
     <button class="chip good" id="good" aria-pressed="false">Good now</button>
     <span class="count" id="count"></span>
     <div class="seg views" role="group" aria-label="View">
-      <button data-view="cards" aria-label="Cards" title="Cards"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg></button><button data-view="list" aria-label="List" title="List"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14" height="2.4" rx="1.2"/><rect x="1" y="6.8" width="14" height="2.4" rx="1.2"/><rect x="1" y="11.6" width="14" height="2.4" rx="1.2"/></svg></button>
+      <button data-view="cards" aria-label="Cards" title="Cards"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg></button><button data-view="list" aria-label="List" title="List"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14" height="2.4" rx="1.2"/><rect x="1" y="6.8" width="14" height="2.4" rx="1.2"/><rect x="1" y="11.6" width="14" height="2.4" rx="1.2"/></svg></button><button data-view="map" aria-label="Map" title="Map"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15s5-4.6 5-8.6A5 5 0 0 0 3 6.4C3 10.4 8 15 8 15zm0-6.6a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" fill-rule="evenodd"/></svg></button>
     </div>
   </div>
 </div>
+<div id="mapview" class="ovmap" hidden></div>
+<div id="maplegend" class="wx-key maplegend" hidden><span>Spots by rating now:</span><span style="--c:#9fb0bd"><i></i>flat / no wind data</span><span style="--c:#e2774a"><i></i>poor</span><span style="--c:#e3b03a"><i></i>fair</span><span style="--c:#3fb56c"><i></i>good</span><span style="--c:#159a8c"><i></i>very good</span><span style="--c:#7a5bd6"><i></i>epic</span><span>· gold ring: your spots · tap a spot for details</span></div>
 <div id="list"><p class="status">Loading…</p></div>
 <div id="foot"></div>
 </main>
 <script src="config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/surf.js"></script>
+<script src="js/overview.js"></script>
 <script src="js/home.js"></script>
 </body>
 </html>

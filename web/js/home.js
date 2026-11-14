@@ -88,12 +88,36 @@
     return S.view === "list" ? `<div class="rows-list">${list.map(row).join("")}</div>` : `<div class="grid">${list.map(card).join("")}</div>`;
   }
 
+  // map view: the coast drawn once (overview.json, fetched the first time it's shown), spots re-placed on
+  // every change; it re-frames itself when the search or filters change
+  let MAP = null, MAPKEY = null;
+  async function showMap(shown) {
+    const box = document.getElementById("mapview");
+    box.hidden = false;
+    if (!MAP) {
+      box.innerHTML = `<p class="status">Loading the map…</p>`;
+      try {
+        const ov = await getJSON(dataURL("overview.json"));
+        if (S.view !== "map") return;
+        MAP = new SurfMap(box, ov, {cond: COND, favs});
+      } catch (e) { box.innerHTML = `<p class="status">Couldn't load the map: ${esc(e.message)}.</p>`; return; }
+    }
+    const key = [S.q, S.area, S.brk, S.good].join("|");
+    MAP.setSpots(shown, key !== MAPKEY);
+    MAPKEY = key;
+  }
+
   function render() {
     const shown = SPOTS.filter(matches);
     const out = [];
+    const mapBox = document.getElementById("mapview");
+    if (S.view === "map") showMap(shown); else mapBox.hidden = true;
+    document.getElementById("maplegend").hidden = S.view !== "map";
     const fav = sorted(shown.filter(s => favs.has(s.slug)));
-    if (fav.length && !S.q) out.push(`<section class="group fav-group"><div class="region"><h2>★ Your spots</h2></div>${block(fav)}</section>`);
-    if (S.sort === "geo") {                           // region, then area, north to south
+    if (S.view === "map") { /* the map shows them */ }
+    else if (fav.length && !S.q) out.push(`<section class="group fav-group"><div class="region"><h2>★ Your spots</h2></div>${block(fav)}</section>`);
+    if (S.view === "map") { /* nothing listed under the map */ }
+    else if (S.sort === "geo") {                      // region, then area, north to south
       let lastRegion = null;
       const byArea = [];
       for (const s of shown) {

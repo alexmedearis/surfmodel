@@ -90,7 +90,10 @@ The same code and Docker image run in four places; `deploy/<env>.env` holds each
   arrival angle, favors lefts/rights, peel side and speed, swell mix, wind relative to the beach, tide, and a
   0-5 surf rating from size, period and wind; in `now.json` as `insights`). Tide isn't in the rating yet:
   which tide each spot likes has to be learned from session reports.
-- `web/`: the website. `index.html` lists the spots; `spot.html?spot=<slug>` shows one. `js/data.js` fetches
+- `products/overview.py`: the overview map behind the spot list's map view: every region's coastline and depth
+  bands from the model's own regional grids (no map tiles to license), published nightly as `v1/overview.json`.
+- `web/`: the website. `index.html` lists the spots (`js/home.js`: search, sort, area and break filters, cards,
+  list or map view (`js/overview.js`), favorites); `spot.html?spot=<slug>` shows one. `js/data.js` fetches
   the spot's published files and assembles the page's data; `js/common.js`, `map.js`, `forecast.js` and
   `lineup.js` draw it; `config.js` says where the data lives. `serve.py` runs it locally.
 - `ribbons.py`: builds single-file spot pages (out/ribbons_*.html, open without a server) from `products/`,

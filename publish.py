@@ -8,6 +8,7 @@
 Layout under the store root (versioned, so old app versions keep working when the format changes):
   v1/spots/index.json                  the spots: slug, name, region, position, break type
   v1/spots/conditions.json             every spot's current surf height and key facts (for the spot list)
+  v1/overview.json                     every region's coastline and depth, for the spot list's map (nightly)
   v1/spots/<slug>/map.json             coastline, depth, map views              (once per spot)
   v1/spots/<slug>/now.json             current swells, paths, surf height       (each buoy reading)
   v1/spots/<slug>/lineup.json + .bin   "In the water" wave field: JSON header + raw grids
@@ -32,13 +33,14 @@ from products.spot_now import spot_now
 from products.spot_lineup import spot_lineup
 from products.spot_forecast import spot_forecast
 from products.spot_weather import spot_weather
+from products.overview import overview_map
 from products.insights import conditions, wind_state, tide_state, rating
 import weather as W
 from products.geometry import Frame, shore_normal
 
 API = "v1"
 PRODUCTS = ("map", "now", "lineup", "forecast", "weather")
-CACHE_SECONDS = dict(map=86400, now=300, lineup=300, forecast=900, weather=300, index=300, conditions=300)   # for the CDN, later
+CACHE_SECONDS = dict(map=86400, now=300, lineup=300, forecast=900, weather=300, index=300, conditions=300, overview=86400)   # for the CDN, later
 
 # ---------- storage ----------
 
@@ -327,6 +329,11 @@ def publish(store, only=PRODUCTS, slugs=None, when=None):
             if n > 1:
                 pool.shutdown()
     print(f"index: {publish_index(store)} spots", flush=True)
+    if "map" in only:
+        ov = overview_map()
+        if ov:
+            store.put(f"{API}/overview.json", _json(ov), cache_seconds=CACHE_SECONDS["overview"])
+            print(f"overview map: {len(ov['regions'])} regions", flush=True)
     if {"now", "forecast", "weather"} & set(only):
         print(f"conditions: {publish_conditions(store)} spots", flush=True)
     return failed
