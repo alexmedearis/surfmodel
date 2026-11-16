@@ -330,8 +330,10 @@ def publish(store, only=PRODUCTS, slugs=None, when=None):
                 pool.shutdown()
     print(f"index: {publish_index(store)} spots", flush=True)
     if "map" in only:
-        ov = overview_map()
+        ov, images = overview_map()
         if ov:
+            for path, data in images.items():
+                store.put(f"{API}/{path}", data, "image/webp", CACHE_SECONDS["overview"])
             store.put(f"{API}/overview.json", _json(ov), cache_seconds=CACHE_SECONDS["overview"])
             print(f"overview map: {len(ov['regions'])} regions", flush=True)
     if {"now", "forecast", "weather"} & set(only):
