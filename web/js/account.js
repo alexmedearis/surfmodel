@@ -13,6 +13,7 @@ const Account = (function () {
   let readyNow, sdk;
   A.ready = new Promise(r => readyNow = r);
   const sdkReady = FB ? load() : Promise.resolve(null);
+  if (!FB) readyNow();
 
   async function load() {
     try {
