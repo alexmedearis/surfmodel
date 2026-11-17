@@ -213,7 +213,7 @@ body>main:first-child>.hero{margin-top:16px}
 .chip{font:inherit;font-size:13px;font-weight:500;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
 .chip:hover{border-color:var(--accent)}
 .chip.on{background:var(--text);color:var(--card);border-color:var(--text)}
-.chip.good.on{background:#3fb56c;border-color:#3fb56c;color:#fff}
+.chip.good.on{background:var(--r3);border-color:var(--r3);color:#fff}
 .count{font-size:12px;color:var(--muted);margin-left:auto}
 .views svg{display:block;fill:currentColor}
 .views button{padding:6px 10px}
@@ -327,3 +327,20 @@ h3.area span{font-size:11px;font-weight:600;background:var(--chip);border-radius
 .ov-scale{position:absolute;left:14px;bottom:14px;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--text);background:color-mix(in srgb,var(--card) 82%,transparent);backdrop-filter:blur(6px);padding:5px 9px;border-radius:9px;pointer-events:none}
 .ov-scale i{display:block;height:6px;border:2px solid currentColor;border-top:0;border-radius:0 0 2px 2px}
 .ov-card:not([hidden])~.ov-scale,.ovmap:has(.ov-card:not([hidden])) .ov-scale{display:none}
+/* ---------- one color system: color = the surf rating; heights and wind are neutral ---------- */
+.spot .ft,.l-ft,.n-ft,.ov-ft{color:var(--text)}
+.sizeword{padding:4px 11px}
+.wtag{background:rgba(255,255,255,.16);color:inherit;font-weight:600}
+.tag .arrow,.n-wind .arrow,.ov-meta .arrow{color:var(--muted)}
+.tag.wind{color:var(--text)}
+.day{background:var(--card)}
+.day::after{background:var(--sz,var(--line))}
+.day.on{border-color:var(--text);box-shadow:0 0 0 1px var(--text)}
+.spark .bar.unrated{background:var(--muted);opacity:.3}
+.rt>span:last-child,.n-meta>span:not(.n-wind){color:var(--text)}
+.maplegend{margin:10px 4px 0;font-size:12px;color:var(--muted)}
+.maplegend[hidden]{display:none}
+/* the rating ramp: one hue, more prominent = better surf (darker on light, brighter on dark) */
+:root{--r0:#d3dbe0;--r1:#b3c8d1;--r2:#7bbccb;--r3:#2c9db0;--r4:#137b93;--r5:#2f3f93;--r-ink:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--r0:#2a3843;--r1:#3a5361;--r2:#3e7e8e;--r3:#3db3c6;--r4:#79d6e2;--r5:#b3bcff;--r-ink:#07131c}}
+:root[data-theme="dark"]{--r0:#2a3843;--r1:#3a5361;--r2:#3e7e8e;--r3:#3db3c6;--r4:#79d6e2;--r5:#b3bcff;--r-ink:#07131c}

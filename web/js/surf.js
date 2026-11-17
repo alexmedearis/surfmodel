@@ -70,7 +70,10 @@ function wavesSVG() {
 
 // Surf rating (0-5, from insights.py): color, word, and five dots.
 const RATING_WORDS = ["flat", "poor", "poor to fair", "fair", "good", "very good", "epic"];
-const ratingColor = r => r < 1 ? "#9fb0bd" : r < 2 ? "#e2774a" : r < 3 ? "#e3b03a" : r < 4 ? "#3fb56c" : r < 5 ? "#159a8c" : "#7a5bd6";
+// One hue that deepens with the rating: poor days fade back, good days stand out (and it reads the same
+// for colour-blind viewers, since it's ordered by lightness).
+const ratingInk = r => r < 3 ? "var(--text)" : "var(--r-ink)";   // text on a rating color
+const ratingColor = r => `var(--r${r < 1 ? 0 : r < 2 ? 1 : r < 3 ? 2 : r < 4 ? 3 : r < 5 ? 4 : 5})`;   // spot.css: --r0..--r5 per theme
 const ratingWord = r => r < 0.5 ? RATING_WORDS[0] : RATING_WORDS[Math.min(6, 1 + Math.floor(r))];
 function ratingDots(r, size = 8) {
   let s = "";
@@ -103,3 +106,9 @@ function dailyBest(series, tz = "America/Los_Angeles") {
   }
   return out;
 }
+
+// Color means one thing on this site: the overall rating. Everything else (height, wind, swell) is
+// shown with numbers, words and arrows. rcolor(): a spot's or a day's rating color, neutral if unrated.
+const NEUTRAL = "var(--line)";
+const rcolor = r => r == null ? NEUTRAL : ratingColor(r);
+const condColor = c => c?.rating && c.rating.wind_known ? ratingColor(c.rating.score) : NEUTRAL;

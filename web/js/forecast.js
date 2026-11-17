@@ -32,8 +32,8 @@ function drawWx(svg,W,pl,pr,X,t0,t1){
   if(w.wind){                                        // wind: arrows (the way it blows) colored by angle to the beach
     lab(46,"Wind (kt)");const every=W<520?12:6;
     for(const h of w.wind.hours){const [t,kt,,d,rel]=h;if(!inR(t)||Math.round(t/3600)%every)continue;
-      const g=el("g",{transform:`translate(${X(t)} 62)`},svg),c=windColor(rel,kt),sc=0.7+Math.min(kt,25)/25*0.6;
-      el("path",{d:"M0 -6.5L4.6 3.5L0 1.2L-4.6 3.5Z",fill:c,transform:`rotate(${(d+180)%360}) scale(${sc})`},g);
+      const g=el("g",{transform:`translate(${X(t)} 62)`},svg),c="var(--text)",sc=0.7+Math.min(kt,25)/25*0.6;
+      el("path",{d:"M0 -6.5L4.6 3.5L0 1.2L-4.6 3.5Z",fill:c,opacity:.72,transform:`rotate(${(d+180)%360}) scale(${sc})`},g);
       el("text",{y:21,"text-anchor":"middle","font-size":10,fill:"var(--muted)"},g).textContent=Math.round(kt)}
   }
   if(w.tide){                                        // tide: the curve, with highs and lows
@@ -67,7 +67,7 @@ function forecastCard(){
     const rs=(WX()?.rating||[]).filter(r=>r[0]>=sr&&r[0]<=ss);d.rating=rs.length?Math.max(...rs.map(r=>r[1])):null;
   }
   const dEl=document.getElementById("fc-days");
-  dEl.innerHTML=shown.map((d,i)=>`<button class="day" data-i="${i}" style="--sz:${sizeColor(sizeAvg(d.lo,d.hi))}"><div class="dn">${i===0&&dayKey(Date.now()/1000)===d.k?"Today":dfmt(d.t0,{weekday:"short"})}</div>
+  dEl.innerHTML=shown.map((d,i)=>`<button class="day" data-i="${i}" style="--sz:${rcolor(d.rating)}"><div class="dn">${i===0&&dayKey(Date.now()/1000)===d.k?"Today":dfmt(d.t0,{weekday:"short"})}</div>
     <div class="dh">${range(d.lo,d.hi)}<small> ft</small></div><div class="ds">${d.sw}</div>${d.rating!=null?`<div class="dr">${ratingDots(d.rating,6)}</div>`:""}</button>`).join("");
   // chart
   const svgF=document.getElementById("fc-svg"),tip=document.getElementById("fc-tip"),wrap=document.getElementById("fc-chart");
@@ -95,13 +95,7 @@ function forecastCard(){
     }
     if(sel!==null){const d=shown[sel];el("rect",{x:X(Math.max(d.t0,t0)),y:pt,width:X(Math.min(d.t1,t1))-X(Math.max(d.t0,t0)),height:Hh-pt-pb,fill:"var(--deep)",opacity:.08},svgF)}
     const band=H.map(h=>[X(h.t),Y(h.hi)]).concat(H.map(h=>[X(h.t),Y(h.lo)]).reverse());
-    // colored by size: a vertical gradient with the size scale's colors at their heights
-    const sizeGrad=typeof SIZE_SCALE==="undefined"?null:(()=>{
-      const g=el("linearGradient",{id:"fc-size",gradientUnits:"userSpaceOnUse",x1:0,x2:0,y1:Y(0),y2:Y(top)},el("defs",{},svgF));
-      let lo=0;for(const [max,col] of SIZE_SCALE){
-        for(const v of [lo,Math.min(max,top)]){if(v<=top)el("stop",{offset:Math.min(1,v/top),"stop-color":col},g)}
-        lo=max;if(lo>=top)break}
-      return"url(#fc-size)"})();
+    const sizeGrad=null;                              // one color for height: color is kept for the rating
     el("path",{d:"M"+band.map(p=>p.join(" ")).join("L")+"Z",fill:sizeGrad||"var(--deep)",opacity:sizeGrad?.32:.28},svgF);
     el("path",{d:"M"+H.map(h=>`${X(h.t)} ${Y((h.lo+h.hi)/2)}`).join("L"),fill:"none",stroke:sizeGrad||"var(--deep)","stroke-width":2.5,"stroke-linejoin":"round"},svgF);
     el("path",{d:"M"+H.map(h=>`${X(h.t)} ${Y(h.off)}`).join("L"),fill:"none",stroke:"var(--muted)","stroke-width":1.5,"stroke-dasharray":"4 3"},svgF);

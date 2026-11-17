@@ -27,13 +27,13 @@
     const best = dailyBest(c.ratings);
     return `<div class="spark${small ? " small" : ""}" aria-label="Next ${days.length} days">${days.map(d => {
       const a = sizeAvg(d.lo, d.hi), r = best[dayKeyOf(d.t)];
-      return `<div class="b" title="${d.lo}–${d.hi} ft${r != null ? ", best " + ratingWord(r) : ""}"><div class="spark-wrap"><div class="bar" style="height:${Math.max(8, a / TOP * 100)}%;--c:${sizeColor(a)}"></div></div>` +
-        (small ? "" : `<span class="d">${wd(d.t)}</span>`) + (r != null ? `<span class="rd" style="--rc:${ratingColor(r)}"></span>` : "") + `</div>`;
+      return `<div class="b" title="${d.lo}–${d.hi} ft${r != null ? ", best " + ratingWord(r) : ""}"><div class="spark-wrap"><div class="bar${r == null ? " unrated" : ""}" style="height:${Math.max(8, a / TOP * 100)}%;--c:${rcolor(r)}"></div></div>` +
+        (small ? "" : `<span class="d">${wd(d.t)}</span>`) + `</div>`;
     }).join("")}</div>`;
   }
   const star = s => `<button class="fav${favs.has(s.slug) ? " on" : ""}" data-fav="${esc(s.slug)}" aria-pressed="${favs.has(s.slug)}" aria-label="${favs.has(s.slug) ? "Remove from" : "Add to"} your spots" title="${favs.has(s.slug) ? "Remove from" : "Add to"} your spots"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-2.9-5.4 2.9 1.1-6-4.5-4.2 6.1-.8z"/></svg></button>`;
   const ratingLine = c => c?.rating && c.rating.wind_known
-    ? `<span class="rt">${ratingDots(c.rating.score, 9)}<span style="color:${ratingColor(c.rating.score)}">${esc(c.rating.word[0].toUpperCase() + c.rating.word.slice(1))}</span></span>` : "";
+    ? `<span class="rt">${ratingDots(c.rating.score, 9)}<span>${esc(c.rating.word[0].toUpperCase() + c.rating.word.slice(1))}</span></span>` : "";
   function tags(c) {
     const t = [];
     if (c?.main) t.push(`<span class="tag">${c.dir != null ? swellArrow(c.dir, 12) : ""}${esc(c.main)}</span>`);
@@ -42,9 +42,9 @@
     if (c?.wind) t.push(windTag(c));
     return t;
   }
-  const windTag = c => `<span class="tag">${swellArrow(c.wind.dir, 12, windColor(c.wind.rel, c.wind.kt))}${c.wind.kt} kt ${esc(windWord(c.wind.rel, c.wind.kt))}</span>`;
+  const windTag = c => `<span class="tag wind">${swellArrow(c.wind.dir, 12)}${c.wind.kt} kt ${esc(windWord(c.wind.rel, c.wind.kt))}</span>`;
   const href = s => `spot.html?spot=${encodeURIComponent(s.slug)}`;
-  const sizeVar = c => c?.surf_ft ? sizeColor(sizeAvg(c.surf_ft[0], c.surf_ft[1])) : "var(--line)";
+  const sizeVar = c => condColor(c);                 // the card's edge: its rating
 
   function card(s) {
     const c = COND[s.slug], has = c?.surf_ft;
@@ -209,9 +209,9 @@
     setup();
     render();
     const newest = (c?.spots || []).map(x => x.buoy_time).filter(Boolean).sort().pop();
-    const scale = SIZE_SCALE.map(([max, col], i) => `<span style="--c:${col}"><i></i>${i ? SIZE_SCALE[i - 1][0] : 0}${max === Infinity ? "+" : "–" + max} ft</span>`).join("");
+    const scale = [[0.5, "poor"], [2, "fair"], [3, "good"], [4, "very good"], [5, "epic"]].map(([r, w]) => `<span style="--c:${ratingColor(r)}"><i></i>${w}</span>`).join("");
     document.getElementById("foot").innerHTML = `<div class="scale">${scale}</div>` +
-      (newest ? `<p class="updated">Buoy readings from ${ago(newest)}. Bars: each day's daytime peak surf height; dots: its best rating (size, period and wind). Tap ☆ to pin a spot to the top.</p>` : "");
+      (newest ? `<p class="updated">Buoy readings from ${ago(newest)}. Colors are the surf rating (size, period and wind together). Bars: each day's daytime peak height, colored by that day's best rating. Tap ☆ to pin a spot to the top.</p>` : "");
   }).catch(e => { document.getElementById("list").innerHTML = `<p class="status">Couldn't load the spot list: ${esc(e.message)}.</p>`; });
 })();
 // a hairline under the toolbar once it sticks to the top

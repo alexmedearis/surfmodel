@@ -22,10 +22,10 @@
     if (!pick.length) return;
     box.innerHTML = `<h2>Nearby</h2><p class="sub">Along the coast from ${esc(DATA.spot)}, right now.</p><div class="near">` + pick.map(({s}) => {
       const x = cond[s.slug], f = x?.surf_ft, r = x?.rating;
-      return `<a class="nspot" href="spot.html?spot=${encodeURIComponent(s.slug)}" style="--sz:${f ? sizeColor(sizeAvg(f[0], f[1])) : "var(--line)"}">
+      return `<a class="nspot" href="spot.html?spot=${encodeURIComponent(s.slug)}" style="--sz:${condColor(x)}">
         <span class="n-name"><b>${esc(s.name)}</b><small>${esc(s.area)}</small></span>
         <span class="n-ft">${f ? `${f[0]}–${f[1]}<small>ft</small>` : "–"}</span>
-        <span class="n-meta">${r && r.wind_known ? `${ratingDots(r.score, 7)}<span style="color:${ratingColor(r.score)}">${esc(r.word)}</span>` : ""}${x?.wind ? `<span class="n-wind">${swellArrow(x.wind.dir, 11, windColor(x.wind.rel, x.wind.kt))}${x.wind.kt} kt ${esc(windWord(x.wind.rel, x.wind.kt))}</span>` : ""}</span></a>`;
+        <span class="n-meta">${r && r.wind_known ? `${ratingDots(r.score, 7)}<span>${esc(r.word)}</span>` : ""}${x?.wind ? `<span class="n-wind">${swellArrow(x.wind.dir, 11)}${x.wind.kt} kt ${esc(windWord(x.wind.rel, x.wind.kt))}</span>` : ""}</span></a>`;
     }).join("") + `</div>`;
     box.hidden = false;
   }).catch(() => {});

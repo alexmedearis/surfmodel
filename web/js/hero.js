@@ -9,7 +9,7 @@
   document.getElementById("size").innerHTML = `${lo}–${hi}<small>ft</small>`;
   const R = DATA.insights && DATA.insights.rating;
   document.getElementById("sizeword").innerHTML =
-    `<span class="sizeword" style="--sz:${sizeColor(sizeAvg(lo, hi))}"><i></i>${sizeWord(lo, hi)}</span>` +
+    `<span class="sizeword">${sizeWord(lo, hi)}</span>` +
     (R && R.wind_known ? `<span class="rating">${ratingDots(R.score, 9)}<b>${R.word[0].toUpperCase() + R.word.slice(1)}</b></span>` : "");
 
   const KIND = {beach: "Beach break", reef: "Reef break", point: "Point break", jetty: "Jetty"};
@@ -22,7 +22,7 @@
   const I0 = DATA.insights || {};
   if (I0.wind) {
     const w = I0.wind;
-    out.push(fact("Wind", `<b>${w.kt} kt ${w.compass}</b> ${swellArrow(w.dir, 14, "#fff")} <span class="wtag" style="--wc:${windColor(w.rel, w.kt)}">${windWord(w.rel, w.kt)}</span>${w.gust_kt >= w.kt + 5 ? ` · gusts ${w.gust_kt}` : ""}`));
+    out.push(fact("Wind", `<b>${w.kt} kt ${w.compass}</b> ${swellArrow(w.dir, 14, "#fff")} <span class="wtag">${windWord(w.rel, w.kt)}</span>${w.gust_kt >= w.kt + 5 ? ` · gusts ${w.gust_kt}` : ""}`));
   }
   if (I0.tide) {
     const t = I0.tide, nx = [t.next_high && ["high", t.next_high], t.next_low && ["low", t.next_low]].filter(Boolean).sort((a, b) => a[1].t - b[1].t)[0];

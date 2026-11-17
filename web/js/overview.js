@@ -120,7 +120,7 @@ class SurfMap {
       const [x, y] = this.xy(s), sx = (x - c.cx) / px + W / 2, sy = (c.cy - y) / px + H / 2;
       if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
       const k = cond[s.slug], f = k?.surf_ft, txt = f ? `${f[0]}–${f[1]}` : "–";
-      const w = txt.length * 6.8 + 16, big = s === this.sel || s === this.hover;
+      const w = txt.length * 6.8 + 16 + (k?.rating?.wind_known && k.rating.score >= 3 ? 0 : 9), big = s === this.sel || s === this.hover;
       const box = [sx - w / 2 - 2, sy - 30, sx + w / 2 + 2, sy - 4];
       if (big || free(box)) { placed.push(box, [sx - 4, sy - 4, sx + 4, sy + 4]); pins.push({s, x, y, txt, w, k}); }
       else dots.push({s, x, y, k});
@@ -129,7 +129,7 @@ class SurfMap {
         if (big || free(nb)) { placed.push(nb); names.push({s, x, y}); }
       }
     }
-    const color = k => k?.rating && k.rating.wind_known ? ratingColor(k.rating.score) : k?.surf_ft ? sizeColor(sizeAvg(...k.surf_ft)) : "#8fa1ae";
+    const color = k => k?.rating && k.rating.wind_known ? ratingColor(k.rating.score) : "#8fa1ae";
     for (const d of dots) {                            // spots without room for a pill
       const m = mk("g", {class: "ov-mk", "data-slug": d.s.slug, role: "button", "aria-label": d.s.name}, g);
       mk("circle", {cx: d.x, cy: -d.y, r: 5 * px, fill: color(d.k), stroke: "#fff", "stroke-width": 1.6 * px, filter: "url(#ov-sh)"}, m);
@@ -142,12 +142,16 @@ class SurfMap {
       const m = mk("g", {class: "ov-mk", "data-slug": p.s.slug, tabindex: 0, role: "button", "aria-label": `${p.s.name}, ${p.txt} ft`}, g);
       const X = p.x, Y = -p.y, top = Y - (8 + 20 * k) * px, r = hh / 2;
       if (p.s === this.sel) mk("circle", {cx: X, cy: Y, r: 14 * px, fill: color(p.k), opacity: .25}, m);
-      mk("path", {d: `M${X - w / 2 + r} ${top}h${w - 2 * r}a${r} ${r} 0 0 1 0 ${hh}H${X + 4.5 * px}L${X} ${Y - 3 * px}L${X - 4.5 * px} ${top + hh}H${X - w / 2 + r}a${r} ${r} 0 0 1 0 ${-hh}Z`,
-                  fill: color(p.k), stroke: p.s === this.sel ? "var(--text)" : "#fff", "stroke-width": 1.5 * px, filter: "url(#ov-sh)"}, m);
-      const t = mk("text", {x: X, y: top + hh / 2 + 4.1 * k * px, "text-anchor": "middle", "font-size": 12 * k * px, "font-weight": 700, fill: "#fff",
-                            "font-family": "Outfit, sans-serif", "letter-spacing": 0.2 * px}, m);
+      const R0 = p.k?.rating?.wind_known ? p.k.rating.score : null, filled = R0 != null && R0 >= 3;
+      const dotW = filled ? 0 : 9 * k * px;              // white pins carry a small rating dot instead
+      mk("path", {d: `M${X - w / 2 - dotW / 2 + r} ${top}h${w + dotW - 2 * r}a${r} ${r} 0 0 1 0 ${hh}H${X + 4.5 * px}L${X} ${Y - 3 * px}L${X - 4.5 * px} ${top + hh}H${X - w / 2 - dotW / 2 + r}a${r} ${r} 0 0 1 0 ${-hh}Z`,
+                  fill: filled ? color(p.k) : "var(--card)", stroke: p.s === this.sel ? "var(--text)" : filled ? "#fff" : "var(--line)",
+                  "stroke-width": 1.5 * px, filter: "url(#ov-sh)"}, m);
+      if (!filled) mk("circle", {cx: X - w / 2 - dotW / 2 + 9 * k * px, cy: top + hh / 2, r: 3.6 * k * px, fill: color(p.k), stroke: "rgba(15,34,49,.18)", "stroke-width": 0.8 * px}, m);
+      const t = mk("text", {x: X + dotW / 2, y: top + hh / 2 + 4.1 * k * px, "text-anchor": "middle", "font-size": 12 * k * px, "font-weight": 700,
+                            fill: filled ? "var(--r-ink)" : "var(--text)", "font-family": "Outfit, sans-serif", "letter-spacing": 0.2 * px}, m);
       t.textContent = p.txt;
-      const ft = mk("tspan", {"font-size": 9 * k * px, "font-weight": 600, dx: 1.5 * px, opacity: .85}, t); ft.textContent = p.txt === "–" ? "" : "ft";
+      const ft = mk("tspan", {"font-size": 9 * k * px, "font-weight": 600, dx: 1.5 * px, opacity: .8}, t); ft.textContent = p.txt === "–" ? "" : "ft";
       if (favs.has(p.s.slug)) {
         mk("circle", {cx: X + w / 2 - 2 * px, cy: top + 1 * px, r: 5.5 * px, fill: "#f2b42a", stroke: "#fff", "stroke-width": 1.2 * px}, m);
         mk("path", {d: `M${X + w / 2 - 2 * px} ${top - 2.6 * px}l${0.95 * px} ${2 * px}l${2.1 * px} ${0.25 * px}l${-1.6 * px} ${1.45 * px}l${0.45 * px} ${2.1 * px}l${-1.9 * px} ${-1.05 * px}l${-1.9 * px} ${1.05 * px}l${0.45 * px} ${-2.1 * px}l${-1.6 * px} ${-1.45 * px}l${2.1 * px} ${-0.25 * px}z`, fill: "#fff"}, m);
@@ -170,11 +174,11 @@ class SurfMap {
     const esc = v => String(v ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
     this.card.innerHTML = `<button class="ov-x" aria-label="Close">×</button>
       <div class="ov-head"><div><b>${esc(s.name)}</b><small>${esc([s.area, KIND[s.break_type]].filter(Boolean).join(" · "))}</small></div>
-      ${f ? `<div class="ov-ft" style="color:${sizeColor(sizeAvg(f[0], f[1]))}">${f[0]}–${f[1]}<small>ft</small></div>` : ""}</div>
-      <div class="ov-meta">${r && r.wind_known ? `<span>${ratingDots(r.score, 8)} <b style="color:${ratingColor(r.score)}">${esc(r.word)}</b></span>` : ""}
+      ${f ? `<div class="ov-ft">${f[0]}–${f[1]}<small>ft</small></div>` : ""}</div>
+      <div class="ov-meta">${r && r.wind_known ? `<span>${ratingDots(r.score, 8)} <b>${esc(r.word)}</b></span>` : ""}
       ${f ? `<span>${sizeWord(f[0], f[1])}</span>` : ""}
       ${k.main ? `<span>${k.dir != null ? swellArrow(k.dir, 12) : ""} ${esc(k.main)}</span>` : ""}
-      ${k.wind ? `<span>${swellArrow(k.wind.dir, 12, windColor(k.wind.rel, k.wind.kt))} ${k.wind.kt} kt ${esc(windWord(k.wind.rel, k.wind.kt))}</span>` : ""}</div>
+      ${k.wind ? `<span>${swellArrow(k.wind.dir, 12)} ${k.wind.kt} kt ${esc(windWord(k.wind.rel, k.wind.kt))}</span>` : ""}</div>
       <a class="ov-open" href="spot.html?spot=${encodeURIComponent(s.slug)}">Open ${esc(s.name)} →</a>`;
     this.card.hidden = false;
     this.card.querySelector(".ov-x").onclick = e => { e.stopPropagation(); this.select(null); };
