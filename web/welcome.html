@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Surf model · California surf forecasts built from the seafloor up</title>
+<meta name="description" content="A wave model for every California break: how each swell bends and wraps into your spot, from real seafloor data, live buoys, wind and tide. Free to check, Pro from $5/month, or free for reporting your sessions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/spot.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body class="landing">
+<nav class="site"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="#0b5d7e"/><path d="M4 16c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M4 11c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#7fe0d9" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></svg>Surf model</a><span class="crumbs"><a class="nav-link" href="./">Spots</a></span></nav>
+<main>
+<header class="lp-hero" id="hero">
+  <svg class="rays" viewBox="0 0 400 400" aria-hidden="true" fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M330 400 C 300 330, 340 270, 300 220 S 330 120, 290 60 L 300 0" stroke-width="3" opacity=".9"/>
+    <g stroke-width="2" opacity=".6">
+      <path d="M0 40 C 120 60, 220 70, 290 64"/><path d="M0 100 C 110 115, 220 130, 300 150"/>
+      <path d="M0 160 C 100 175, 200 200, 296 232"/><path d="M0 220 C 90 240, 190 270, 300 290"/>
+      <path d="M0 280 C 80 300, 180 330, 318 350"/>
+    </g>
+    <g stroke-width="1.2" opacity=".35" stroke-dasharray="3 7">
+      <path d="M20 10 C 60 120, 120 220, 300 225"/><path d="M60 0 C 100 100, 170 150, 292 120"/><path d="M0 330 C 120 300, 220 280, 305 270"/>
+    </g>
+  </svg>
+  <div class="kicker">California surf forecasts</div>
+  <h1>Built from the seafloor up.</h1>
+  <p>Every break gets its own wave model: how each swell bends, shrinks and wraps over the real seafloor into your spot,
+    driven by live buoys, NOAA's swell forecast, wind and tide. Then checked by surfers in the water.</p>
+  <div class="hero-cta"><a class="cta light big" id="cta-trial" href="account.html">Start 14 days of Pro, free</a><a class="cta-link" id="cta-sub" href="./">Check today's surf →</a></div>
+  <svg class="waves" viewBox="0 0 1600 70" preserveAspectRatio="none" aria-hidden="true"></svg>
+</header>
+<div class="now-strip" id="now"></div>
+<p class="now-cap" id="now-cap"></p>
+
+<section class="lp-sec">
+  <h2>Why it's different</h2>
+  <p class="lede">Most forecasts take one offshore number and stretch it across a stretch of coast. Surf doesn't work that way.</p>
+  <div class="feats">
+    <div class="feat"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="var(--chip)"/><path d="M8 26c4-8 10-12 24-12M8 31c5-6 12-9 24-9" stroke="var(--r4)" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M30 8v26" stroke="var(--text)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <h3>A model for every spot</h3><p>Two breaks a mile apart get different numbers, because the model knows the reef, the headland and the canyon between them, from NOAA's depth data.</p></div>
+    <div class="feat"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="var(--chip)"/><circle cx="20" cy="20" r="9" stroke="var(--r4)" stroke-width="2.4" fill="none"/><circle cx="20" cy="20" r="3" fill="var(--text)"/></svg>
+      <h3>See why, not just what</h3><p>Follow each swell's path into the spot on the swell map, and watch what the mix looks like at the break in the lineup view. No black box.</p></div>
+    <div class="feat"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="12" fill="var(--chip)"/><path d="M12 22l6 6 11-14" stroke="var(--r4)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h3>Kept honest by the lineup</h3><p>Surfers report what it was really like. Everyone sees the reports, and they tune the model spot by spot, so it gets better where people surf.</p></div>
+  </div>
+</section>
+
+<section class="lp-sec">
+  <h2>One rating, colored by how good it is</h2>
+  <p class="lede">Size, swell period and wind rolled into one score per spot, per hour. Scan the coast for color and you've found the surf.</p>
+  <div class="compare">
+    <div class="card"><h3>Free, for everyone</h3><ul>
+      <li>Every spot right now: surf height, rating, wind and tide</li>
+      <li>The spot list, search and the coast map</li>
+      <li>Each spot's swell map: how today's swells wrap in</li>
+      <li>The week at a glance: each day's best rating</li>
+      <li>Surf reports and cams from the lineup</li></ul></div>
+    <div class="card"><h3>Pro, for planning the week</h3><ul>
+      <li>Every hour of the next 7 days: height, wind, tide and rating</li>
+      <li>The lineup view on each spot's real coastline and seafloor</li>
+      <li>Where each swell breaks and which way it peels</li>
+      <li>Surf alerts when your spot turns on (coming next)</li></ul></div>
+  </div>
+</section>
+
+<section class="lp-sec" id="pricing">
+  <h2>Simple pricing</h2>
+  <p class="lede">Start with 14 days of Pro, no card. After that it's free to check, a few dollars to plan, or free for helping out.</p>
+  <div class="plans">
+    <div class="plan"><h3>Free</h3><div class="price">$0</div><div class="per">no account needed</div>
+      <ul><li>Every spot right now</li><li>Rating, wind and tide</li><li>Swell maps and the coast map</li><li>The week at a glance</li><li>Reports and cams</li></ul>
+      <a class="cta ghost" href="./">Check the surf</a></div>
+    <div class="plan featured"><h3>Pro <span class="pro-badge">14 days free</span></h3><div class="price">$5<small> / month</small></div><div class="per">or $40 a year · less than a wax bar a month</div>
+      <ul><li>Everything in Free</li><li>Hourly 7-day forecast: height, wind, tide, rating</li><li>The lineup view, on the real seafloor</li><li>Post reports and add cams</li><li class="soon">Surf alerts for your spots</li></ul>
+      <a class="cta" id="cta-plan" href="account.html">Start your free trial</a></div>
+    <div class="plan"><h3>Pro, earned</h3><div class="price">$0</div><div class="per">for surfers who share</div>
+      <ul><li>Everything in Pro</li><li>+3 days for every session you report</li><li>Pro for as long as your cam is live</li><li>Surf twice a week, report each time, and you never pay</li></ul>
+      <a class="cta ghost" href="#earn">How it works</a></div>
+  </div>
+</section>
+
+<section class="lp-sec" id="earn">
+  <h2>Keep Pro free by sharing</h2>
+  <p class="lede">The best surf forecast is a model plus the people in the water. Help build it, and Pro is on us.</p>
+  <div class="earn">
+    <div class="feat"><span class="gain">+3 days of Pro</span><h3>Report your session</h3><p>Size, how good it was, the wind, a note. Thirty seconds from the beach. Everyone sees it, and it calibrates the model for that spot.</p></div>
+    <div class="feat"><span class="gain">Pro while it's live</span><h3>Add a cam</h3><p>Got a window on the break, or know a cam nobody's found? Add it to the spot's page and you have Pro for as long as it's up.</p></div>
+    <div class="feat"><span class="gain">It adds up</span><h3>Stacks up to 30 days</h3><p>Credits stack ahead (one per day you surf), so a regular never runs out, and a trip away doesn't cost you.</p></div>
+  </div>
+</section>
+
+<section class="lp-sec">
+  <h2>Questions</h2>
+  <div class="faq">
+    <details><summary>Where does it cover?</summary><p>The San Francisco Bay Area and Santa Cruz / Monterey Bay today, 31 spots from Bolinas to Carmel. The rest of California is next, region by region.</p></details>
+    <details><summary>Do I need a card for the trial?</summary><p>No. Create an account and you have Pro for 14 days. When it ends you're on the free plan; nothing is ever charged unless you subscribe.</p></details>
+    <details><summary>Where does the data come from?</summary><p>Seafloor depths from NOAA, live swell from CDIP and NOAA buoys, the 7-day swell forecast from NOAA's WaveWatch III, wind from the National Weather Service and tides from NOAA. The wave model on top of them is ours.</p></details>
+    <details><summary>How accurate is it?</summary><p>It's new, and we're open about that. The physics gets the shape of each spot right (which swells it picks up, how much they shrink on the way in); the reports from surfers are how the exact heights get tuned. Every report makes the next forecast better.</p></details>
+    <details><summary>Is this safety advice?</summary><p>No. It's a forecast, and the ocean doesn't read forecasts. Look before you paddle out, and know your limits.</p></details>
+  </div>
+</section>
+
+<section class="lp-final">
+  <h2>See how it's breaking right now.</h2>
+  <p>Free to check. 14 days of Pro when you sign up.</p>
+  <div class="hero-cta"><a class="cta light big" href="./">Check today's surf</a><a class="cta-link" id="cta-final" href="account.html">Start your free trial →</a></div>
+</section>
+<p class="lp-foot">Surf model · California · Forecasts are estimates, not safety advice.</p>
+</main>
+<script src="config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/surf.js"></script>
+<script src="js/account.js"></script>
+<script>
+(function () {
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  document.querySelector("#hero .waves").outerHTML = wavesSVG();
+  // signed in already: the trial buttons go to the spots / the account instead
+  Account.onChange(p => {
+    if (p.tier === "anon") return;
+    const set = (id, text, href) => { const a = document.getElementById(id); if (a) { a.textContent = text; a.href = href; } };
+    set("cta-trial", "Check today's surf", "./");
+    set("cta-sub", "Your account →", "account.html");
+    set("cta-plan", p.pro ? "You have Pro" : "See your plan", "account.html");
+    set("cta-final", "Your account →", "account.html");
+  });
+  // the best spots right now, live: the product is the pitch
+  Promise.all([getJSON(dataURL("spots/index.json")), getJSON(dataURL("spots/conditions.json"))]).then(([d, c]) => {
+    const name = Object.fromEntries(d.spots.map(s => [s.slug, s]));
+    const top = (c.spots || []).filter(x => x.surf_ft && name[x.slug])
+      .sort((a, b) => (b.rating?.score ?? -1) - (a.rating?.score ?? -1) || b.surf_ft[1] - a.surf_ft[1]).slice(0, 4);
+    document.getElementById("now").innerHTML = top.map(x => {
+      const r = x.rating, s = name[x.slug];
+      return `<a class="now-spot" href="spot.html?spot=${encodeURIComponent(x.slug)}" style="--sz:${condColor(x)}">
+        <small>${esc(s.area || s.region_name || "")}</small><b>${esc(s.name)}</b>
+        <div class="ft">${x.surf_ft[0]}–${x.surf_ft[1]}<small> ft</small></div>
+        <div class="rt">${r && r.wind_known ? `${ratingDots(r.score, 8)}<span>${esc(r.word)}</span>` : ""}${x.wind ? `<span>· ${x.wind.kt} kt ${esc(windWord(x.wind.rel, x.wind.kt))}</span>` : ""}</div></a>`;
+    }).join("");
+    const newest = (c.spots || []).map(x => x.buoy_time).filter(Boolean).sort().pop();
+    document.getElementById("now-cap").textContent = `The best-rated spots right now${newest ? `, from buoy readings ${ago(newest)}` : ""}.`;
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>

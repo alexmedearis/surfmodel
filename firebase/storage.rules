@@ -1,15 +1,27 @@
 rules_version = '2';
 // Published model data (written only by the jobs' service account, which bypasses these rules).
-// Readable by anyone for now; when the site becomes paid, gate the premium files here, e.g.
-//   allow read: if request.auth != null && request.auth.token.subscriber == true;
+// Everything is public except the Pro files of each spot (forecast, weather, lineup): those need an
+// account whose 14-day trial is running or whose earned/paid Pro (proUntil, set only by the server)
+// hasn't run out. See docs/business.md. Reading Firestore from here is a "cross-service" rule: the
+// first deploy asks to grant Storage access to Firestore.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /v1/{path=**} {
+    function isPro() {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return u.created + duration.value(14, 'd') > request.time
+          || u.get('proUntil', timestamp.value(0)) > request.time;
+    }
+    match /v1/spots/{slug}/{file} {
+      allow read: if !file.matches('(forecast|weather|lineup)[.].*') || (request.auth != null && isPro());
+    }
+    match /v1/spots/{file} {                     // index.json, conditions.json
       allow read: if true;
-      allow write: if false;
+    }
+    match /v1/{dir}/{rest=**} {                  // overview.json, overview/ images
+      allow read: if dir != 'spots';
     }
     match /{path=**} {
-      allow read, write: if false;
+      allow write: if false;
     }
   }
 }

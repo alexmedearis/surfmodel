@@ -1,0 +1,11 @@
+{
+  "indexes": [
+    {"collectionGroup": "reports", "queryScope": "COLLECTION",
+     "fields": [{"fieldPath": "spot", "order": "ASCENDING"}, {"fieldPath": "at", "order": "DESCENDING"}]},
+    {"collectionGroup": "reports", "queryScope": "COLLECTION",
+     "fields": [{"fieldPath": "uid", "order": "ASCENDING"}, {"fieldPath": "at", "order": "DESCENDING"}]},
+    {"collectionGroup": "cams", "queryScope": "COLLECTION",
+     "fields": [{"fieldPath": "uid", "order": "ASCENDING"}, {"fieldPath": "at", "order": "DESCENDING"}]}
+  ],
+  "fieldOverrides": []
+}

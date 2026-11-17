@@ -5,6 +5,7 @@ in the Docker image, and (later) as a Cloud Run Job on a schedule.
   python jobs.py forecast    7-day forecast from the newest WaveWatch III run            (every 6 hours)
   python jobs.py nightly     spot maps, overview map, spot index                         (once a day)
   python jobs.py all         everything: first run, or local development
+  python jobs.py credits     earned Pro from surf reports and cams (credits.py)          (every 15 minutes)
 
 Where it writes: --store, else the SURF_STORE setting, else out/data (see publish.py).
 Exits non-zero if any spot failed, so the scheduler can flag it; the other spots still publish.
@@ -24,6 +25,9 @@ def main(argv):
     store_spec = None
     if "--store" in args:
         i = args.index("--store"); store_spec = args[i + 1]; del args[i:i + 2]
+    if args == ["credits"]:
+        import credits
+        return credits.run()
     if len(args) != 1 or args[0] not in JOBS:
         sys.exit(__doc__)
     t0 = time.time()

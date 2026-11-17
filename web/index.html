@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="css/spot.css">
+<link rel="stylesheet" href="css/site.css">
 </head>
 <body>
 <nav class="site"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="#0b5d7e"/><path d="M4 16c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M4 11c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#7fe0d9" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></svg>Surf model</a></nav>
@@ -16,6 +17,7 @@
   <div class="kicker">California surf</div>
   <h1>Where's it breaking?</h1>
   <p>Surf height, how each swell wraps in, and a 7-day forecast, from a wave model of every spot's real seafloor.</p>
+  <div class="hero-cta" id="hero-cta" hidden><a class="cta light" href="account.html">Try Pro free for 14 days</a><a class="cta-link" href="welcome.html">How it works →</a></div>
 </header>
 <div class="toolbar" id="toolbar">
   <div class="search">
@@ -44,6 +46,8 @@
 </main>
 <script src="config.js"></script>
 <script src="js/data.js"></script>
+<script src="js/account.js"></script>
+<script>Account.onChange(p => document.getElementById("hero-cta").hidden = p.tier !== "anon")</script>
 <script src="js/surf.js"></script>
 <script src="js/overview.js"></script>
 <script src="js/home.js"></script>

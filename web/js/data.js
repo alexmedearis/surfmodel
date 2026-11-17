@@ -15,9 +15,18 @@ const BIN_TYPES = {uint8: Uint8Array, uint16le: Uint16Array};   // every browser
 
 const spotFile = (slug, name) => dataURL(`spots/${encodeURIComponent(slug)}/${name}`);
 
-async function getJSON(url, optional) {
-  const r = await fetch(url);
+// `pro`: one of a spot's Pro files (firebase/storage.rules): sent with the account's sign-in token, and
+// LOCKED (rather than an error) if this account can't read it.
+const LOCKED = Object.freeze({locked: true});
+async function fetchData(url, pro) {
+  const t = pro && typeof Account !== "undefined" && Account.enabled ? await Account.token() : null;
+  return fetch(url, t ? {headers: {Authorization: `Firebase ${t}`}} : undefined);
+}
+
+async function getJSON(url, optional, pro) {
+  const r = await fetchData(url, pro);
   if (!r.ok) {
+    if (pro && (r.status === 401 || r.status === 403)) return LOCKED;
     if (optional && r.status === 404) return null;
     throw new Error(r.status === 404 ? "not found" : `couldn't load ${url} (${r.status})`);
   }
@@ -52,13 +61,15 @@ const pageFields = d => {                     // drop the file labels, keep the 
 };
 
 async function loadSpot(slug) {
-  const [m, n, f, lu, wx] = await Promise.all([
+  let [m, n, f, lu, wx] = await Promise.all([
     getJSON(spotFile(slug, "map.json")), getJSON(spotFile(slug, "now.json")),
-    getJSON(spotFile(slug, "forecast.json"), true), getJSON(spotFile(slug, "lineup.json"), true),
-    getJSON(spotFile(slug, "weather.json"), true).catch(() => null)]);
+    getJSON(spotFile(slug, "forecast.json"), true, true), getJSON(spotFile(slug, "lineup.json"), true, true),
+    getJSON(spotFile(slug, "weather.json"), true, true).catch(() => null)]);
+  const locked = [f, lu, wx].includes(LOCKED);            // a Pro file this account can't read
+  [f, lu, wx] = [f, lu, wx].map(x => x === LOCKED ? null : x);
   let lineup = null;
   if (lu && lu.swells && lu.swells.length) {
-    const r = await fetch(spotFile(slug, lu.bin_file));
+    const r = await fetchData(spotFile(slug, lu.bin_file), true);
     if (!r.ok) throw new Error(`couldn't load ${lu.bin_file} (${r.status})`);
     const buf = await r.arrayBuffer();
     if (buf.byteLength !== lu.bin_bytes) throw new Error("the wave data is being updated; reload in a moment");
@@ -72,6 +83,7 @@ async function loadSpot(slug) {
     insights: n.insights || null, facts: m.facts || null,     // website extras (insights.py)
     area: m.area || "", region_name: m.region_name || "",
     weather: pageFields(wx),                                  // wind, tide, rating (spot_weather.py)
+    locked,                                                   // community.js offers Pro instead
     updated: {now: n.generated_at, buoy: n.buoy_time, forecast: f && f.generated_at},
   };
 }
@@ -83,6 +95,7 @@ async function bootSpot(scripts) {
   const fail = msg => { status.innerHTML = msg + ' <a href="./">See all spots</a>.'; status.hidden = false; };
   if (!slug) return fail("No spot chosen.");
   let data;
+  if (typeof Account !== "undefined") await Account.ready;   // signed in first, for the Pro files
   try {
     data = await loadSpot(slug);
   } catch (e) {

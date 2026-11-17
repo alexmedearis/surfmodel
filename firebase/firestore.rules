@@ -1,7 +1,64 @@
 rules_version = '2';
-// Nothing uses Firestore yet (accounts and session logs will). Closed until then.
+// Accounts, surf reports and cams (docs/business.md).
+//   users/{uid}    created (server time, starts the 14-day trial), name; proUntil is written only by the
+//                  server (the credits job: earned Pro from reports and cams, later payments)
+//   reports/{id}   what a surfer saw at a spot: public, so everyone sees them
+//   cams/{id}      a cam someone added: public once an admin sets status to "live"
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    function validName(n) { return n is string && n.size() <= 40; }
+    function validSpot(s) { return s is string && s.matches('[a-z0-9-]{1,40}'); }
+
+    match /users/{uid} {
+      allow read: if isMe(uid);
+      allow create: if isMe(uid)
+        && request.resource.data.keys().hasOnly(['created', 'name'])
+        && request.resource.data.created == request.time
+        && validName(request.resource.data.get('name', ''));
+      // only the display name can change; the trial start and earned Pro can't be touched from the browser
+      allow update: if isMe(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && validName(request.resource.data.name);
+      allow delete: if false;
+    }
+
+    match /reports/{id} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'spot', 'at', 'size', 'quality', 'wind', 'note'])
+        && request.resource.data.keys().hasAll(['uid', 'spot', 'at', 'size', 'quality'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.at == request.time
+        && validSpot(request.resource.data.spot)
+        && validName(request.resource.data.get('name', ''))
+        && request.resource.data.size in ['flat', 'ankle-knee', 'knee-waist', 'waist-chest', 'chest-head',
+                                          'head-overhead', 'well-overhead', 'double-overhead']
+        && request.resource.data.quality is int
+        && request.resource.data.quality >= 1 && request.resource.data.quality <= 5
+        && request.resource.data.get('wind', 'glassy') in ['glassy', 'light', 'choppy', 'blown-out']
+        && request.resource.data.get('note', '') is string
+        && request.resource.data.get('note', '').size() <= 280;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /cams/{id} {
+      allow read: if resource.data.status == 'live' || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'spot', 'url', 'note', 'host', 'status', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.at == request.time
+        && validSpot(request.resource.data.spot)
+        && request.resource.data.url is string && request.resource.data.url.matches('https://[^ ]{4,500}')
+        && request.resource.data.host is bool
+        && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 280;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;          // approval (status -> live) is done by an admin in the console
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

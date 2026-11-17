@@ -24,7 +24,7 @@ JOBS_SA="surf-jobs@$PROJECT.iam.gserviceaccount.com"
 SCHED_SA="surf-scheduler@$PROJECT.iam.gserviceaccount.com"
 
 echo "== APIs"
-$G services enable run.googleapis.com cloudscheduler.googleapis.com artifactregistry.googleapis.com
+$G services enable run.googleapis.com cloudscheduler.googleapis.com artifactregistry.googleapis.com firestore.googleapis.com
 
 echo "== image registry ($REGION)"
 $G artifacts repositories describe surf --location="$REGION" >/dev/null 2>&1 ||
@@ -42,5 +42,8 @@ gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --project="$PROJECT
   --member="serviceAccount:$JOBS_SA" --role=roles/storage.objectAdmin >/dev/null
 $G projects add-iam-policy-binding "$PROJECT" --condition=None \
   --member="serviceAccount:$SCHED_SA" --role=roles/run.invoker >/dev/null
+# the credits job reads reports and cams and writes each account's earned Pro
+$G projects add-iam-policy-binding "$PROJECT" --condition=None \
+  --member="serviceAccount:$JOBS_SA" --role=roles/datastore.user >/dev/null
 
 echo "done: $ENV_NAME ($PROJECT) is ready for deploy/deploy.sh $ENV_NAME"

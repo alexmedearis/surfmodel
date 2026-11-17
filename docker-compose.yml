@@ -23,4 +23,5 @@ services:
     environment:
       SURF_STORE: gs://demo-surf.firebasestorage.app
       STORAGE_EMULATOR_HOST: http://emulators:9199
+      FIRESTORE_EMULATOR_HOST: emulators:8080
       GOOGLE_CLOUD_PROJECT: demo-surf

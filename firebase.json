@@ -8,7 +8,7 @@
     ]
   },
   "storage": {"rules": "firebase/storage.rules"},
-  "firestore": {"rules": "firebase/firestore.rules"},
+  "firestore": {"rules": "firebase/firestore.rules", "indexes": "firebase/firestore.indexes.json"},
   "emulators": {
     "singleProjectMode": true,
     "ui": {"enabled": true, "host": "0.0.0.0", "port": 4000},

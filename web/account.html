@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your account · Surf model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/spot.css">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body class="acct-page">
+<nav class="site"><a class="brand" href="./"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="#0b5d7e"/><path d="M4 16c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M4 11c3 0 3-3 6-3s3 3 6 3 3-3 6-3" fill="none" stroke="#7fe0d9" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></svg>Surf model</a><span class="crumbs"><a class="crumb" href="./">All spots</a></span></nav>
+<main>
+<p class="status" id="status">Loading…</p>
+<div id="app" hidden></div>
+</main>
+<script src="config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/surf.js"></script>
+<script src="js/account.js"></script>
+<script>
+(function () {
+  const app = document.getElementById("app"), status = document.getElementById("status");
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const fmtDate = d => d.toLocaleDateString("en-US", {weekday: "short", month: "short", day: "numeric"});
+  const SIZE = {"flat": "Flat", "ankle-knee": "Ankle–knee", "knee-waist": "Knee–waist", "waist-chest": "Waist–chest", "chest-head": "Chest–head",
+                "head-overhead": "Head high+", "well-overhead": "Well overhead", "double-overhead": "Double+"};
+  let spots = {};
+  getJSON(dataURL("spots/index.json")).then(d => spots = Object.fromEntries(d.spots.map(s => [s.slug, s.name]))).catch(() => {});
+  const show = html => { status.hidden = true; app.hidden = false; app.innerHTML = html; };
+  const goNext = () => { const n = Account.nextPage(); if (n) { location.href = n; return true; } return false; };
+
+  if (!Account.enabled) {
+    show(`<div class="card"><h2>Accounts are off here</h2><p class="sub">This is the plain local site (python serve.py), where everything is unlocked.
+      To try accounts, run the Firebase emulators: <code>make emulators</code>, then open http://localhost:5050/account.html.</p></div>`);
+    return;
+  }
+
+  function signIn(msg = "") {
+    show(`<div class="card">
+      <h2>Start your free ${Account.TRIAL_DAYS}-day Pro trial</h2>
+      <p class="sub">Sign in or create an account. No card, and nothing is charged when the trial ends: you go back to the free plan,
+        and you can keep Pro free by reporting your sessions.</p>
+      <div class="signin-btns">
+        <button class="gbtn" id="google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continue with Google</button>
+        <div class="or">or</div>
+        <form class="email-row" id="email-form"><input class="field" type="email" name="email" required placeholder="you@example.com" autocomplete="email" aria-label="Email"><button class="cta" type="submit">Email me a link</button></form>
+        <span class="form-msg" role="status">${esc(msg)}</span>
+      </div>
+    </div>
+    <div class="card"><h2>What you get</h2>
+      <div class="ways">
+        <div class="way"><span class="gain">${Account.TRIAL_DAYS} days</span><div><b>Pro, free, right away</b><span>Hourly 7-day forecast with wind, tide and rating, and the lineup view on each spot's real seafloor.</span></div></div>
+        <div class="way"><span class="gain">+${Account.REPORT_DAYS} days</span><div><b>For every session you report</b><span>Tell everyone how it was. Your report also tunes the model for that spot.</span></div></div>
+        <div class="way"><span class="gain">Pro</span><div><b>For as long as your cam is live</b><span>Host a cam at a spot, or share one you know about.</span></div></div>
+      </div></div>`);
+    document.getElementById("google").onclick = () => Account.signInGoogle().catch(e => signIn(`Couldn't sign in: ${e.message}`));
+    document.getElementById("email-form").onsubmit = async e => {
+      e.preventDefault();
+      const email = new FormData(e.target).get("email");
+      try {
+        await Account.sendLink(email);
+        show(`<div class="card"><h2>Check your email</h2><p class="sub">We sent a sign-in link to <b>${esc(email)}</b>. Open it on this device to finish.</p>
+          ${SURF.firebase.emulators ? `<p class="emu-note">Local emulators: no email is sent. The link is in the emulator UI under Authentication (http://localhost:4000/auth).</p>` : ""}</div>`);
+      } catch (err) { signIn(`Couldn't send the link: ${err.message}`); }
+    };
+  }
+
+  async function signedIn(p) {
+    const u = Account.user, prof = Account.profile || {};
+    const head = p.tier === "trial" ? `Pro trial · ${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"} left`
+      : p.tier === "pro" ? `Pro · ${p.daysLeft} day${p.daysLeft === 1 ? "" : "s"} left` : "Free plan";
+    const detail = p.tier === "trial" ? `Your trial runs until ${fmtDate(p.until)}. Every session you report adds ${Account.REPORT_DAYS} more days.`
+      : p.tier === "pro" ? `Pro until ${fmtDate(p.until)}, earned from your reports and cams. Keep reporting to keep it going.`
+      : `Your trial ended ${fmtDate(p.trialEnd)}. Report a session to get ${Account.REPORT_DAYS} days of Pro, or add a cam for Pro while it's live.`;
+    const pct = p.pro ? Math.min(100, p.daysLeft / 30 * 100) : 0;
+    show(`<div class="card">
+      <div class="plan-status"><div><div class="sub">Your plan</div><div class="big">${head}</div></div>${p.pro ? `<span class="pro-badge">Pro</span>` : ""}</div>
+      <div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div>
+      <p class="sub">${detail}</p>
+      <div class="ways">
+        <div class="way"><span class="gain">+${Account.REPORT_DAYS} days</span><div><b>Report a session</b><span>On any spot's page, under “From the lineup”. One credit a day, stacking up to 30 days ahead.</span></div></div>
+        <div class="way"><span class="gain">Pro</span><div><b>Add a cam</b><span>Host one, or share one you know about. Pro for as long as it's live.</span></div></div>
+        <div class="way"><span class="gain">$5/mo</span><div><b>Subscribe</b><span>Payments open soon ($5 a month or $40 a year). Until then, your trial and earned days are all you need.</span></div></div>
+      </div>
+    </div>
+    <div class="card"><h2>Your reports</h2><ul class="mine" id="my-reports"><li class="sub">Loading…</li></ul></div>
+    <div class="card"><h2>Your cams</h2><ul class="mine" id="my-cams"><li class="sub">Loading…</li></ul></div>
+    <div class="card"><h2>Profile</h2>
+      <p class="sub">Signed in as ${esc(u.email || u.displayName || "")}.</p>
+      <form class="cform" id="name-form" style="border:0;padding:0">
+        <label class="fl" for="name">Name on your reports</label>
+        <div class="email-row"><input class="field" id="name" name="name" maxlength="40" value="${esc(prof.name || "")}" placeholder="A surfer"><button class="cta ghost" type="submit">Save</button></div>
+        <span class="form-msg" role="status"></span>
+      </form>
+      <div class="cta-row"><button class="cta ghost" id="signout">Sign out</button></div>
+    </div>`);
+    document.getElementById("signout").onclick = () => Account.signOut();
+    document.getElementById("name-form").onsubmit = async e => {
+      e.preventDefault();
+      const m = e.target.querySelector(".form-msg");
+      try { await Account.setName(new FormData(e.target).get("name") || ""); m.textContent = "Saved."; } catch (err) { m.textContent = `Couldn't save: ${err.message}`; }
+    };
+    const when = ts => ts?.toMillis ? fmtDate(new Date(ts.toMillis())) : "just now";
+    const spotName = s => esc(spots[s] || s);
+    Account.myReports().then(rs => {
+      document.getElementById("my-reports").innerHTML = rs.length ? rs.map(r =>
+        `<li><a href="spot.html?spot=${encodeURIComponent(r.spot)}">${spotName(r.spot)}</a><span>${esc(SIZE[r.size] || r.size)}</span>${ratingDots(r.quality, 7)}<span class="when">${when(r.at)}</span><button data-del="${esc(r.id)}">Delete</button></li>`).join("")
+        : `<li class="sub">None yet. Open a spot and tell everyone how it was: +${Account.REPORT_DAYS} days of Pro.</li>`;
+    }).catch(e => document.getElementById("my-reports").innerHTML = `<li class="sub">Couldn't load: ${esc(e.message)}</li>`);
+    Account.myCams().then(cs => {
+      document.getElementById("my-cams").innerHTML = cs.length ? cs.map(c =>
+        `<li><a href="spot.html?spot=${encodeURIComponent(c.spot)}">${spotName(c.spot)}</a><span class="status-tag ${esc(c.status)}">${c.status === "live" ? "Live" : "In review"}</span><span class="when">${when(c.at)}</span></li>`).join("")
+        : `<li class="sub">None yet. Add one from a spot's page, under “From the lineup”.</li>`;
+    }).catch(e => document.getElementById("my-cams").innerHTML = `<li class="sub">Couldn't load: ${esc(e.message)}</li>`);
+    app.onclick = async e => {
+      const b = e.target.closest("[data-del]");
+      if (b && confirm("Delete this report?")) { await Account.deleteReport(b.dataset.del); b.closest("li").remove(); }
+    };
+  }
+
+  let linkTried = false;
+  Account.onChange(async p => {
+    if (!linkTried) {
+      linkTried = true;
+      try { if (await Account.finishLink()) return; } catch (e) { return signIn(`Couldn't finish signing in: ${e.message}`); }
+    }
+    if (Account.failed) return show(`<div class="card"><h2>Accounts aren't available right now</h2><p class="sub">Check your connection and reload.</p></div>`);
+    if (p.tier === "anon") return signIn();
+    if (goNext()) return;
+    signedIn(p);
+  });
+})();
+</script>
+</body>
+</html>

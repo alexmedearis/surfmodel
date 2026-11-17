@@ -22,9 +22,18 @@ def load_env(name):
 def build(name):
     env = load_env(name)
     out = os.path.join(HERE, "build", "web")
-    shutil.rmtree(out, ignore_errors=True)
-    shutil.copytree(os.path.join(HERE, "web"), out)
-    cfg = dict(env=name, storage=dict(host=env["STORAGE_HOST"], bucket=env["BUCKET"]))
+    # empty the folder rather than replace it: the emulators' Docker mount points at this folder itself
+    os.makedirs(out, exist_ok=True)
+    for f in os.listdir(out):
+        p = os.path.join(out, f)
+        shutil.rmtree(p) if os.path.isdir(p) and not os.path.islink(p) else os.remove(p)
+    shutil.copytree(os.path.join(HERE, "web"), out, dirs_exist_ok=True)
+    cfg = dict(env=name, storage=dict(host=env["STORAGE_HOST"], bucket=env["BUCKET"]),
+               # accounts (js/account.js): the Firebase web app settings, and on a laptop the emulators
+               firebase=dict(apiKey=env["API_KEY"], authDomain=f"{env['PROJECT']}.firebaseapp.com",
+                             projectId=env["PROJECT"], storageBucket=env["BUCKET"]))
+    if env.get("EMULATORS"):
+        cfg["firebase"]["emulators"] = dict(auth="http://localhost:9099", firestore=["localhost", 8080])
     with open(os.path.join(out, "config.js"), "w") as fh:
         fh.write(f"// Built by deploy/build_web.py for '{name}'.\nwindow.SURF_CONFIG = {json.dumps(cfg)};\n")
     print(f"built build/web for {name}: data from {env['BUCKET']}")

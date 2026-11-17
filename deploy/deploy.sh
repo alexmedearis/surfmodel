@@ -30,6 +30,7 @@ schedule() {                      # UTC cron for each job
     hourly)   echo "10 * * * *" ;;           # buoys report every 30-60 min
     forecast) echo "40 5,11,17,23 * * *" ;;  # ~5.5 h after each WaveWatch III run (00/06/12/18 UTC)
     nightly)  echo "20 10 * * *" ;;          # 2-3 am in California
+    credits)  echo "*/15 * * * *" ;;         # earned Pro shows up within 15 minutes of a report
   esac
 }
 
@@ -37,11 +38,14 @@ echo "== image $IMAGE"
 gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet >/dev/null
 docker buildx build --platform linux/amd64 -t "$IMAGE" --push .   # Cloud Run runs Intel/AMD machines
 
-for JOB in hourly forecast nightly; do
+for JOB in hourly forecast nightly credits; do
   echo "== job surf-$JOB"
+  SIZE="--cpu=4 --memory=4Gi --task-timeout=30m"
+  [ "$JOB" = credits ] && SIZE="--cpu=1 --memory=512Mi --task-timeout=5m"
+  # shellcheck disable=SC2086
   $G run jobs deploy "surf-$JOB" --region="$REGION" --image="$IMAGE" --args="$JOB" \
-     --service-account="$JOBS_SA" --set-env-vars="SURF_STORE=gs://$BUCKET,SURF_WORKERS=4" \
-     --cpu=4 --memory=4Gi --task-timeout=30m --max-retries=1
+     --service-account="$JOBS_SA" --set-env-vars="SURF_STORE=gs://$BUCKET,SURF_WORKERS=4,GOOGLE_CLOUD_PROJECT=$PROJECT" \
+     $SIZE --max-retries=1
   URI="https://run.googleapis.com/v2/projects/$PROJECT/locations/$REGION/jobs/surf-$JOB:run"
   VERB=create
   $G scheduler jobs describe "surf-$JOB" --location="$REGION" >/dev/null 2>&1 && VERB=update
@@ -51,6 +55,6 @@ done
 
 echo "== website and Storage rules"
 python3 deploy/build_web.py "$ENV_NAME"
-firebase deploy --project "$PROJECT" --only hosting,storage --non-interactive
+firebase deploy --project "$PROJECT" --only hosting,storage,firestore --non-interactive
 
 echo "deployed $TAG to $ENV_NAME: https://$PROJECT.web.app"

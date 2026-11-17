@@ -4,3 +4,4 @@ scipy==1.18.1
 requests==2.32.5
 matplotlib==3.10.8      # products/geometry.py uses it to trace depth contours and coastlines
 google-cloud-storage==3.17.1   # publishing to Cloud Storage / the Firebase Storage emulator
+google-cloud-firestore==2.34.1 # the credits job: earned Pro (credits.py)
